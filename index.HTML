@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>おえもり LOL BATTLE - DEUCE & FIX</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Hiragino Sans', sans-serif; background: #1a1a2e; color: #fff; overflow-x: hidden; }
+        .container { max-width: 900px; margin: 0 auto; padding: 10px; }
+        .screen { display: none; background: #16213e; padding: 20px; border-radius: 15px; min-height: 650px; position: relative; border: 1px solid #0f3460; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #0f3460; padding: 10px 15px; border-radius: 10px; margin-bottom: 10px; border: 1px solid #1a1a2e; }
+        .score-info { font-size: 24px; font-weight: bold; color: #e94560; }
+        .timer-circle { background: #e94560; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 2px solid #fff; }
+        canvas { background: white; border: 4px solid #533483; border-radius: 5px; max-width: 100%; display: block; margin: 0 auto; touch-action: none; cursor: crosshair; }
+        .spectate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
+        .mini-box { background: #0f3460; padding: 5px; border-radius: 8px; text-align: center; border: 1px solid #533483; }
+        .mini-canvas { width: 100%; border: 1px solid #533483; background: #fff; }
+        button { padding: 10px 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
+        .btn-green { background: #22a6b3; color: white; }
+        .btn-red { background: #e94560; color: white; }
+        .btn-gray { background: #535c68; color: white; }
+        .btn-blue { background: #4834d4; color: white; }
+        .color-palette { display: flex; gap: 12px; justify-content: center; margin: 15px 0; }
+        .color-dot { width: 38px; height: 38px; border-radius: 50%; cursor: pointer; border: 3px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3); }
+        .color-dot.active { border-color: #f1c40f; transform: scale(1.2); }
+        .guess-log { background: #fff; color: #333; height: 80px; overflow-y: auto; margin-top: 10px; padding: 8px; font-size: 14px; border-radius: 5px; text-align: left; }
+        .team-card { padding: 20px; border-radius: 10px; cursor: pointer; width: 140px; text-align: center; font-weight: bold; transition: 0.3s; }
+        .team-A { border: 3px solid #e94560; color: #e94560; }
+        .team-A.active { background: #e94560; color: #fff; }
+        .team-B { border: 3px solid #22a6b3; color: #22a6b3; }
+        .team-B.active { background: #22a6b3; color: #fff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="screen-login" class="screen" style="display: block; text-align:center;">
+            <h1 style="margin: 60px 0; color:#e94560; font-size: 40px;">LOL おえもり BATTLE</h1>
+            <input type="text" id="user-name" placeholder="サモナー名を入力" style="padding:15px; width:280px; border-radius:8px; border:none; font-size: 18px;">
+            <br><br>
+            <button id="enter-btn" class="btn-green" style="width:280px; font-size: 18px;">フィールドへ出る</button>
+        </div>
+
+        <div id="screen-lobby" class="screen">
+            <h2 style="text-align:center; margin-bottom: 20px;">チーム選択 (10点+2点差勝利)</h2>
+            <div style="display:flex; gap:30px; justify-content:center; margin:40px 0;">
+                <div id="btn-team-A" class="team-card team-A">Aチーム</div>
+                <div id="btn-team-B" class="team-card team-B">Bチーム</div>
+            </div>
+            <button id="start-btn" class="btn-green" style="display:none; margin:0 auto; width:220px; font-size: 18px;">ゲーム開始</button>
+            <ul id="player-list" style="list-style:none; text-align:center; margin-top:30px; font-size: 18px;"></ul>
+            <button id="dissolve-btn-lobby" class="btn-red" style="position:absolute; bottom:20px; left:20px;">解散</button>
+        </div>
+
+        <div id="screen-game" class="screen">
+            <div class="header">
+                <div class="score-info">A: <span id="scoreA">0</span> / B: <span id="scoreB">0</span></div>
+                <div class="timer-circle" id="timer">60</div>
+                <button id="dissolve-btn-game" class="btn-red" style="padding:5px 12px;">解散</button>
+            </div>
+            <div id="play-view">
+                <h3 id="game-tip" style="text-align:center; margin-bottom:10px; color:#f1c40f; font-size: 22px;"></h3>
+                <canvas id="canvas" width="600" height="400"></canvas>
+                <div id="draw-ui" style="text-align:center;">
+                    <div class="color-palette">
+                        <div class="color-dot active" data-color="#000000" style="background:#000;"></div>
+                        <div class="color-dot" data-color="#e94560" style="background:#e94560;"></div>
+                        <div class="color-dot" data-color="#22a6b3" style="background:#22a6b3;"></div>
+                        <div class="color-dot" data-color="#2ed573" style="background:#2ed573;"></div>
+                        <div class="color-dot" data-color="#ffffff" style="background:#fff;"></div>
+                    </div>
+                    <button id="undo-btn" class="btn-gray" style="margin-right:10px;">一筆戻す</button>
+                    <button id="clear-btn" class="btn-gray">全部消去</button>
+                </div>
+                <div id="guess-ui" style="background:#0f3460; padding:20px; border-radius:10px; text-align:center; margin-top:10px; border: 1px solid #533483;">
+                    <input type="text" id="guess-input" placeholder="答えを入力！" style="padding:12px; width:200px; border-radius:5px; border:none; font-size: 16px;">
+                    <button id="guess-btn" class="btn-green" style="font-size: 16px;">回答 (<span id="guesses-left"></span>)</button>
+                    <div id="my-team-logs" class="guess-log"></div>
+                </div>
+            </div>
+            <div id="spectate-view" style="display:none; text-align:center;">
+                <h2 style="color:#22a6b3; margin-top: 50px;">正解！味方を信じて待機中...</h2>
+                <div class="spectate-grid" id="spectate-grid"></div>
+            </div>
+            <div id="leader-next-area" style="display:none; margin-top:20px; text-align:center;">
+                <button id="leader-skip-btn" class="btn-blue" style="width:280px; font-size: 20px;">次の問題へ進む</button>
+            </div>
+        </div>
+
+        <div id="screen-reveal" class="screen" style="text-align:center;">
+            <h1 id="reveal-title" style="font-size: 40px; margin-bottom: 10px;"></h1>
+            <h2 id="ans-label" style="background:#f1c40f; color:#333; padding:15px 30px; border-radius:8px; display:inline-block; margin:20px 0; font-size: 30px;"></h2>
+            <div class="spectate-grid" id="reveal-grid"></div>
+        </div>
+
+        <div id="screen-winner" class="screen" style="text-align:center;">
+            <h1 id="winner-name" style="font-size:60px; margin-top:120px; color:#e94560; text-shadow: 0 0 20px rgba(233,69,96,0.5);"></h1>
+            <h2 id="final-score" style="margin:30px; font-size: 35px; color: #ccc;"></h2>
+            <button id="back-lobby-btn" class="btn-green" style="font-size: 22px; padding: 15px 40px;">ロビーへ戻る</button>
+        </div>
+    </div>
+
+    <script>
+        // Firebase設定
+        const firebaseConfig = {
+            apiKey: "AIzaSyCq07YShbz-_hung73k85_nfmOAWNN3CCs",
+            authDomain: "esiritori-11854.firebaseapp.com",
+            databaseURL: "https://esiritori-11854-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "esiritori-11854",
+            storageBucket: "esiritori-11854.firebasestorage.app",
+            messagingSenderId: "321524994593",
+            appId: "1:321524994593:web:377f53e342651fc6aac960"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const gameRef = db.ref('oemori_lol_final_v7');
+
+        let myId = sessionStorage.getItem('sid') || 'p' + Math.random().toString(36).substr(2, 7);
+        sessionStorage.setItem('sid', myId);
+        let myName = ""; let myTeam = "A"; let gameState = {};
+        let isDrawing = false; let lastPos = {x:0, y:0}; let currentColor = "#000000"; let currentStrokeId = null;
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.lineCap = 'round'; ctx.lineWidth = 5;
+
+        const allWords = [
+            "アーリ", "アカリ", "アクシャン", "アッシュ", "アニー", "アムム", "アリスター", "アンベッサ", "アーゴット", "イブリン", "イレリア", "イラオイ", "ウーコン", "ウディア", "エイトロックス", "エコー", "エズリアル", "エリス", "オラフ", "オリアナ", "オレリオン・ソル", "オーロラ", "オーン", "カイ＝サ", "カサディン", "カシオペア", "カ・サンテ", "カタリナ", "カミール", "カリスタ", "カルマ", "カ＝ジックス", "ガリオ", "ガングプランク", "ガレン", "キヤナ", "キンドレッド", "クイン", "クレッド", "グウェン", "グラガス", "グレイブス", "ケイトリン", "ケイル", "ケイン", "ケネン", "コグ＝マウ", "コーキ", "サイオン", "サイラス", "サミーラ", "シェン", "シャコ", "シン・ジャオ", "シンジド", "シンドラ", "シヴィア", "ジグス", "ジリアン", "ジン", "ジンクス", "ジャーヴァンIV", "ジャンナ", "スウェイン", "スカーナー", "スレッシュ", "スモルダー", "セジュアニ", "セト", "セナ", "セラフィーン", "ゼド", "ゼラス", "ゼリ", "ソナ", "ソラカ", "ゾーイ", "タリヤ", "タリック", "タロン", "ダイアナ", "ダリウス", "チョ＝ガス", "ツイステッド・フェイト", "トゥイッチ", "トランドル", "トリスターナ", "トリンダメア", "ドクター・ムンド", "ドレイヴン", "ナサス", "ナフィーリ", "ナミ", "ニダリー", "ニーコ", "ニーラ", "ヌヌ＆ウィルンプ", "ノクターン", "ノーチラス", "ハイマーディンガー", "パイク", "パンテオン", "バード", "バイ", "ヴァルス", "ヴィエゴ", "ビクター", "ブラウム", "ブライアー", "ブラッドミア", "ブランド", "ブリッツクランク", "ベイガー", "ベル＝ヴェス", "ベックス", "へカリム", "ポッピー", "ボリベア", "マオカイ", "マスター・イー", "マルザハール", "マルファイト", "ミス・フォーチュン", "ミリオ", "モルガナ", "モルデカイザー", "ヤスオ", "ユナラ", "ユーミ", "ヨネ", "ヨリック", "ライズ", "ラカン", "ラックス", "ラムス", "レル", "リヴェン", "リサンドラ", "リリア", "リー・シン", "ルシアン", "ルル", "ルブラン", "レネクトン", "レナータ・グラスク", "レオナ", "レク＝サイ", "レンガー", "ワーウィック", "ザーヘン", "フェイ", "メル"
+        ];
+
+        // 判定緩和ロジック
+        function isCorrectAnswer(input, target) {
+            const normalize = (s) => (s||"").replace(/[IVⅣ＆＆・＝= \-\[\]]/g, "").toLowerCase()
+                                     .replace(/[ぁ-ん]/g, m => String.fromCharCode(m.charCodeAt(0) + 0x60));
+            const inNorm = normalize(input); const tgNorm = normalize(target);
+            return inNorm.length >= 2 && (tgNorm.includes(inNorm) || inNorm.includes(tgNorm));
+        }
+
+        function checkWin(sA, sB) { return (Math.max(sA, sB) >= 10 && Math.abs(sA - sB) >= 2); }
+
+        function canIDraw() {
+            if (gameState.status !== 'playing') return false;
+            const ps = Object.values(gameState.players || {}).filter(p => p.team === myTeam);
+            const drawer = ps[(gameState.currentTurn - 1) % ps.length];
+            return drawer && drawer.id === myId;
+        }
+
+        function nextQ() {
+            gameRef.once('value', snap => {
+                const used = Object.values(snap.val().usedWords || {});
+                const available = allWords.filter(w => !used.includes(w));
+                const word = available.length ? available[Math.floor(Math.random()*available.length)] : allWords[Math.floor(Math.random()*allWords.length)];
+                gameRef.update({
+                    status: 'playing', targetWord: word, startTime: Date.now(),
+                    currentTurn: (snap.val().currentTurn || 0) + 1,
+                    correctTeams: { A: false, B: false }, finishedTeams: { A: false, B: false }, correctCount: 0
+                });
+                gameRef.child('usedWords').push(word);
+                gameRef.child('strokes').remove(); gameRef.child('guesses').remove();
+            });
+        }
+
+        document.getElementById('enter-btn').onclick = () => {
+            myName = document.getElementById('user-name').value.trim(); if(!myName) return;
+            gameRef.once('value', snap => {
+                if(!snap.exists() || snap.val().status==='dissolved') gameRef.set({status:'waiting', leaderId:myId, scoreA:0, scoreB:0});
+                gameRef.child('players/'+myId).set({id:myId, name:myName, team:myTeam});
+            });
+        };
+
+        const setTeamUI = (t) => {
+            document.getElementById('btn-team-A').className = `team-card team-A ${t==='A'?'active':''}`;
+            document.getElementById('btn-team-B').className = `team-card team-B ${t==='B'?'active':''}`;
+        };
+        document.getElementById('btn-team-A').onclick = () => { myTeam="A"; setTeamUI("A"); if(myName) gameRef.child('players/'+myId).update({team:"A"}); };
+        document.getElementById('btn-team-B').onclick = () => { myTeam="B"; setTeamUI("B"); if(myName) gameRef.child('players/'+myId).update({team:"B"}); };
+
+        document.getElementById('start-btn').onclick = document.getElementById('leader-skip-btn').onclick = () => {
+            if(checkWin(gameState.scoreA, gameState.scoreB)) gameRef.update({status:'winner'}); else nextQ();
+        };
+
+        gameRef.on('value', snap => {
+            const data = snap.val(); if(!data) return;
+            if(data.status==='dissolved'){ if(myName) { alert("解散しました"); location.reload(); } return; }
+            gameState = data;
+            document.querySelectorAll('.screen').forEach(s => s.style.display='none');
+            if(!myName) document.getElementById('screen-login').style.display='block';
+            else if(data.status==='playing'){ document.getElementById('screen-game').style.display='block'; renderUI(); }
+            else if(data.status==='reveal'){ document.getElementById('screen-reveal').style.display='block'; renderReveal(); }
+            else if(data.status==='winner'){ document.getElementById('screen-winner').style.display='block'; renderWin(); }
+            else { 
+                document.getElementById('screen-lobby').style.display='block';
+                const list = document.getElementById('player-list'); list.innerHTML = "";
+                Object.values(data.players || {}).forEach(p => list.innerHTML += `<li>${p.team==='A'?'🔴':'🔵'} ${p.name}</li>`);
+                document.getElementById('start-btn').style.display = data.leaderId===myId ? 'block' : 'none';
+                setTeamUI(myTeam);
+            }
+        });
+
+        function renderUI() {
+            document.getElementById('scoreA').textContent = gameState.scoreA;
+            document.getElementById('scoreB').textContent = gameState.scoreB;
+            const mySolved = gameState.correctTeams && gameState.correctTeams[myTeam];
+            const iAmDrawer = canIDraw();
+            
+            const allFin = gameState.finishedTeams && gameState.finishedTeams.A && gameState.finishedTeams.B;
+            document.getElementById('leader-next-area').style.display = (allFin && gameState.leaderId === myId) ? 'block' : 'none';
+
+            if(mySolved) {
+                document.getElementById('play-view').style.display = 'none';
+                document.getElementById('spectate-view').style.display = 'block';
+            } else {
+                document.getElementById('play-view').style.display = 'block';
+                document.getElementById('spectate-view').style.display = 'none';
+                document.getElementById('draw-ui').style.display = iAmDrawer ? 'block' : 'none';
+                document.getElementById('guess-ui').style.display = iAmDrawer ? 'none' : 'block';
+                document.getElementById('game-tip').textContent = iAmDrawer ? `お題：${gameState.targetWord}` : "何のチャンピオン？";
+                const teamG = Object.values(gameState.guesses || {}).filter(g => g.team === myTeam);
+                document.getElementById('guesses-left').textContent = Math.max(0, 3 - teamG.length);
+            }
+        }
+
+        document.getElementById('guess-btn').onclick = () => {
+            const val = document.getElementById('guess-input').value.trim(); if(!val) return;
+            document.getElementById('guess-input').value = "";
+            const teamG = Object.values(gameState.guesses || {}).filter(g => g.team === myTeam);
+            if(teamG.length >= 3) return;
+            gameRef.child('guesses').push({team:myTeam, word:val});
+
+            if(isCorrectAnswer(val, gameState.targetWord)) {
+                const pts = (gameState.correctCount === 0) ? 2 : 1;
+                const ns = (gameState[`score${myTeam}`] || 0) + pts;
+                const os = gameState[myTeam==='A'?'scoreB':'scoreA'] || 0;
+                const up = { correctCount: (gameState.correctCount || 0) + 1 };
+                up[`score${myTeam}`] = ns; up[`correctTeams/${myTeam}`] = true; up[`finishedTeams/${myTeam}`] = true;
+                if(checkWin(ns, os)) up.status = 'winner';
+                gameRef.update(up);
+            } else if(teamG.length + 1 >= 3) {
+                gameRef.child(`finishedTeams/${myTeam}`).set(true);
+            }
+        };
+
+        setInterval(() => {
+            if(gameState.status==='playing' && gameState.startTime){
+                const rem = Math.max(0, 60 - Math.floor((Date.now()-gameState.startTime)/1000));
+                document.getElementById('timer').textContent = rem;
+                if(rem<=0 && gameState.leaderId===myId){
+                    if(checkWin(gameState.scoreA, gameState.scoreB)) gameRef.update({status:'winner'});
+                    else { gameRef.update({status:'reveal', revealMsg:"タイムアップ！"}); setTimeout(nextQ, 4000); }
+                }
+            }
+        }, 1000);
+
+        // 描画イベント (厳格)
+        const getXY = (e) => {
+            const r = canvas.getBoundingClientRect();
+            const x = (e.touches ? e.touches[0].clientX : e.clientX) - r.left;
+            const y = (e.touches ? e.touches[0].clientY : e.clientY) - r.top;
+            return {x, y};
+        };
+        canvas.onmousedown = canvas.ontouchstart = (e) => {
+            if(!canIDraw()) return;
+            isDrawing = true; lastPos = getXY(e);
+            currentStrokeId = Date.now() + "_" + myId;
+            if(e.type==='touchstart') e.preventDefault();
+        };
+        canvas.onmousemove = canvas.ontouchmove = (e) => {
+            if(!isDrawing || !canIDraw()) return;
+            const p = getXY(e);
+            gameRef.child('strokes').push({x1:lastPos.x, y1:lastPos.y, x2:p.x, y2:p.y, color:currentColor, team:myTeam, strokeId:currentStrokeId});
+            lastPos = p;
+        };
+        window.onmouseup = window.ontouchend = () => isDrawing = false;
+
+        // ストローク同期
+        gameRef.child('strokes').on('value', snap => {
+            const s = snap.val() || {};
+            ctx.clearRect(0,0,600,400);
+            Object.values(s).forEach(v => {
+                if(v.team===myTeam || gameState.status==='reveal'){
+                    ctx.beginPath(); ctx.strokeStyle = v.color; ctx.lineWidth = 5;
+                    ctx.moveTo(v.x1, v.y1); ctx.lineTo(v.x2, v.y2); ctx.stroke();
+                }
+            });
+            ['A','B'].forEach(t => {
+                const mini = document.getElementById(gameState.status==='reveal'?'rev-can-'+t:'mini-can-'+t);
+                if(mini){
+                    const mctx = mini.getContext('2d'); mctx.clearRect(0,0,600,400); mctx.lineWidth = 3;
+                    Object.values(s).forEach(v => { if(v.team===t){ mctx.beginPath(); mctx.strokeStyle=v.color; mctx.moveTo(v.x1,v.y1); mctx.lineTo(v.x2,v.y2); mctx.stroke(); }});
+                }
+            });
+        });
+
+        gameRef.child('guesses').on('value', snap => {
+            const l = document.getElementById('my-team-logs'); if(!l) return;
+            l.innerHTML = ""; Object.values(snap.val()||{}).forEach(g => { if(g.team===myTeam) l.innerHTML = `<div>> ${g.word}</div>` + l.innerHTML; });
+        });
+
+        function renderReveal() { 
+            document.getElementById('reveal-title').textContent = gameState.revealMsg || "結果発表";
+            document.getElementById('ans-label').textContent = "正解は：" + gameState.targetWord; 
+        }
+        function renderWin() {
+            const winT = gameState.scoreA > gameState.scoreB ? 'A' : 'B';
+            document.getElementById('winner-name').textContent = winT + " チームの勝利！";
+            document.getElementById('final-score').textContent = `最終スコア ${gameState.scoreA} - ${gameState.scoreB}`;
+        }
+        gameRef.child('players').on('value', () => {
+            ['spectate-grid', 'reveal-grid'].forEach(id => {
+                const g = document.getElementById(id); if(!g) return;
+                g.innerHTML = ""; ['A','B'].forEach(t => {
+                    const cid = id==='reveal-grid' ? 'rev-can-'+t : 'mini-can-'+t;
+                    g.innerHTML += `<div class="mini-box"><h5 style="color:${t==='A'?'#e94560':'#22a6b3'}">TEAM ${t}</h5><canvas id="${cid}" class="mini-canvas" width="600" height="400"></canvas></div>`;
+                });
+            });
+        });
+
+        // 修正版：一筆戻す
+        document.getElementById('undo-btn').onclick = () => {
+            if (!canIDraw()) return;
+            gameRef.child('strokes').orderByChild('team').equalTo(myTeam).limitToLast(1).once('value', snap => {
+                if (!snap.exists()) return;
+                const lastSid = Object.values(snap.val())[0].strokeId;
+                gameRef.child('strokes').once('value', all => {
+                    const up = {};
+                    all.forEach(s => { if(s.val().strokeId === lastSid) up[s.key] = null; });
+                    gameRef.child('strokes').update(up);
+                });
+            });
+        };
+        document.getElementById('clear-btn').onclick = () => {
+            if (!canIDraw()) return;
+            gameRef.child('strokes').once('value', all => {
+                const up = {};
+                all.forEach(s => { if(s.val().team === myTeam) up[s.key] = null; });
+                gameRef.child('strokes').update(up);
+            });
+        };
+
+        document.getElementById('back-lobby-btn').onclick = () => gameRef.update({status:'waiting', scoreA:0, scoreB:0, usedWords:{}, currentTurn:0});
+        document.getElementById('dissolve-btn-lobby').onclick = document.getElementById('dissolve-btn-game').onclick = () => { if(confirm("解散しますか？")) gameRef.set({status:'dissolved'}); };
+        document.querySelectorAll('.color-dot').forEach(d => d.onclick = () => {
+            document.querySelectorAll('.color-dot').forEach(el => el.classList.remove('active'));
+            d.classList.add('active'); currentColor = d.dataset.color;
+        });
+    </script>
+</body>
+</html>
