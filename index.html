@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoL早押しクイズ - オンライン対戦</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght:700;900&family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --gold: #C89B3C;
+            --dark-blue: #0A1428;
+            --blue: #0BC4E2;
+            --purple: #A855F7;
+            --red: #EF4444;
+            --green: #10B981;
+            --orange: #F97316;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #0A1428 0%, #1a2744 50%, #0A1428 100%);
+            color: white;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(11, 196, 226, 0.15) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .container {
+            max-width: 100vw;
+            min-height: 100vh;
+            padding: 1rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(1.5rem, 4vw, 2rem);
+            text-align: center;
+            margin-bottom: 0.3rem;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--blue);
+            font-size: clamp(0.8rem, 2vw, 1rem);
+            margin-bottom: 1rem;
+            letter-spacing: 1px;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        .setup-card, .lobby-card {
+            background: rgba(26, 39, 68, 0.8);
+            border: 2px solid var(--gold);
+            border-radius: 15px;
+            padding: 1.5rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 700px;
+            margin: 0 auto;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.4rem;
+            color: var(--gold);
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.6rem;
+            background: rgba(10, 20, 40, 0.7);
+            border: 2px solid var(--blue);
+            border-radius: 8px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--gold);
+        }
+
+        .btn {
+            padding: 0.8rem 2rem;
+            background: linear-gradient(135deg, var(--gold) 0%, #d4af37 100%);
+            border: none;
+            border-radius: 10px;
+            color: var(--dark-blue);
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%);
+            color: white;
+        }
+
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.8rem;
+            margin-top: 0.8rem;
+        }
+
+        .category-option {
+            padding: 0.8rem;
+            background: rgba(10, 20, 40, 0.7);
+            border: 2px solid var(--blue);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .category-option:hover {
+            transform: translateY(-2px);
+            border-color: var(--gold);
+        }
+
+        .category-option.selected {
+            background: linear-gradient(135deg, var(--gold) 0%, #d4af37 100%);
+            border-color: var(--gold);
+            color: var(--dark-blue);
+        }
+
+        .quiz-layout {
+            display: grid;
+            grid-template-columns: 1fr 280px;
+            gap: 1rem;
+            height: calc(100vh - 100px);
+            max-height: calc(100vh - 100px);
+        }
+
+        .quiz-main {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            min-height: 0;
+        }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(26, 39, 68, 0.8);
+            border: 2px solid var(--gold);
+            border-radius: 10px;
+            padding: 0.8rem 1rem;
+            flex-shrink: 0;
+        }
+
+        .round-info {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.1rem;
+            color: var(--gold);
+        }
+
+        .timer {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1.5rem;
+            color: var(--blue);
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .timer.warning {
+            color: var(--red);
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .question-section {
+            flex: 1;
+            background: rgba(26, 39, 68, 0.9);
+            border: 2px solid var(--purple);
+            border-radius: 15px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .question-image {
+            max-width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border: 3px solid var(--gold);
+            border-radius: 10px;
+            margin: 0 auto;
+            display: block;
+        }
+
+        .question-text {
+            font-size: clamp(1.2rem, 3vw, 1.5rem);
+            font-weight: 700;
+            text-align: center;
+            line-height: 1.5;
+        }
+
+        .buzzer-section {
+            text-align: center;
+        }
+
+        .buzzer-btn {
+            padding: 1.5rem 3rem;
+            background: linear-gradient(135deg, var(--orange) 0%, var(--red) 100%);
+            border: 3px solid var(--gold);
+            border-radius: 15px;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .buzzer-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .buzzer-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .answer-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .answer-input-area {
+            background: rgba(10, 20, 40, 0.5);
+            border: 2px solid var(--gold);
+            border-radius: 10px;
+            padding: 1.5rem;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--gold);
+            text-align: center;
+            word-break: break-all;
+        }
+
+        .choice-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.8rem;
+        }
+
+        .choice-btn {
+            padding: 1.2rem;
+            background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%);
+            border: 3px solid transparent;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .choice-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            border-color: var(--gold);
+        }
+
+        .choice-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 0.8rem;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .scoreboard {
+            background: rgba(26, 39, 68, 0.9);
+            border: 2px solid var(--gold);
+            border-radius: 10px;
+            padding: 1rem;
+            flex-shrink: 0;
+        }
+
+        .scoreboard h3 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--gold);
+            margin-bottom: 0.8rem;
+            text-align: center;
+            font-size: 1.1rem;
+        }
+
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem;
+            margin-bottom: 0.4rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            border-left: 3px solid var(--blue);
+        }
+
+        .score-item.first {
+            border-left-color: var(--gold);
+            background: rgba(200, 155, 60, 0.1);
+        }
+
+        .score-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .score-points {
+            color: var(--gold);
+            font-family: 'Orbitron', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .progress-box {
+            background: rgba(26, 39, 68, 0.9);
+            border: 2px solid var(--purple);
+            border-radius: 10px;
+            padding: 1rem;
+            flex-shrink: 0;
+        }
+
+        .progress-box h3 {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--purple);
+            margin-bottom: 0.8rem;
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        .progress-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.5rem;
+            margin-bottom: 0.4rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            font-size: 0.85rem;
+        }
+
+        .progress-item.answered {
+            border-left: 3px solid var(--green);
+        }
+
+        .progress-item.wrong {
+            border-left: 3px solid var(--red);
+        }
+
+        .progress-name {
+            font-weight: 700;
+        }
+
+        .progress-badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+        }
+
+        .progress-badge.correct {
+            background: var(--green);
+            color: white;
+        }
+
+        .progress-badge.incorrect {
+            background: var(--red);
+            color: white;
+        }
+
+        .progress-badge.first {
+            background: var(--gold);
+            color: var(--dark-blue);
+        }
+
+        .mistakes-info {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid var(--red);
+            border-radius: 6px;
+            padding: 0.4rem;
+            text-align: center;
+            margin-top: 0.3rem;
+            font-size: 0.75rem;
+        }
+
+        .connection-status {
+            position: fixed;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 0.4rem 0.8rem;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            z-index: 100;
+            font-size: 0.8rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+        }
+
+        .status-dot.disconnected {
+            background: var(--red);
+        }
+
+        .results-card {
+            background: rgba(26, 39, 68, 0.9);
+            border: 3px solid var(--gold);
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .trophy {
+            font-size: 4rem;
+            margin-bottom: 0.8rem;
+        }
+
+        .winner-name {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            color: var(--gold);
+            margin-bottom: 1rem;
+        }
+
+        .results-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="connection-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">接続中</span>
+    </div>
+
+    <div class="container">
+        <h1>LoL早押しクイズ</h1>
+        <p class="subtitle">League of Legends - オンライン対戦</p>
+
+        <div id="homeScreen" class="screen active">
+            <div class="setup-card">
+                <div class="input-group">
+                    <label>プレイヤー名</label>
+                    <input type="text" id="playerName" placeholder="あなたの名前を入力" maxlength="20">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                    <button class="btn" id="createRoomBtn">ルームを作成</button>
+                    <button class="btn btn-secondary" id="joinRoomBtn">ルームに参加</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="joinScreen" class="screen">
+            <div class="setup-card">
+                <div class="input-group">
+                    <label>ルームコード</label>
+                    <input type="text" id="roomCodeInput" placeholder="6桁のコードを入力" maxlength="6" style="text-transform: uppercase;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                    <button class="btn btn-secondary" id="backToHomeBtn">戻る</button>
+                    <button class="btn" id="joinBtn">参加</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="lobbyScreen" class="screen">
+            <div class="lobby-card">
+                <div style="background: rgba(10, 20, 40, 0.9); border: 2px solid var(--gold); border-radius: 10px; padding: 1rem; text-align: center; margin-bottom: 1rem;">
+                    <div style="color: var(--blue); font-size: 0.9rem; margin-bottom: 0.3rem;">ルームコード</div>
+                    <div style="font-family: 'Orbitron', sans-serif; font-size: 2rem; color: var(--gold); letter-spacing: 6px; margin: 0.3rem 0;" id="roomCode">------</div>
+                    <button id="copyCodeBtn" style="padding: 0.5rem 1.2rem; background: var(--blue); border: none; border-radius: 8px; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem;">📋 コピー</button>
+                </div>
+
+                <div class="input-group" id="hostSettings">
+                    <label>出題範囲設定（複数選択可）</label>
+                    <div class="category-grid" id="categoryGrid">
+                        <div class="category-option selected" data-category="champion">🎭 チャンピオン名</div>
+                        <div class="category-option" data-category="skill">⚔️ スキル効果</div>
+                        <div class="category-option" data-category="lore">📖 ストーリー</div>
+                        <div class="category-option" data-category="combo">🎯 コンボ</div>
+                        <div class="category-option" data-category="cooldown">⏱️ クールダウン</div>
+                        <div class="category-option" data-category="proplay">🏆 プロシーン</div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;" id="hostSettings2">
+                    <div class="input-group">
+                        <label>勝利条件</label>
+                        <select id="winPoints">
+                            <option value="5">先に5ポイント</option>
+                            <option value="10" selected>先に10ポイント</option>
+                            <option value="15">先に15ポイント</option>
+                            <option value="20">先に20ポイント</option>
+                            <option value="30">先に30ポイント</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>お手付き許容</label>
+                        <select id="mistakesAllowed">
+                            <option value="1">1回まで</option>
+                            <option value="2" selected>2回まで</option>
+                            <option value="3">3回まで</option>
+                            <option value="5">5回まで</option>
+                            <option value="999">無制限</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>参加プレイヤー</label>
+                    <div style="background: rgba(10, 20, 40, 0.7); border-radius: 10px; padding: 1rem;" id="playersList"></div>
+                </div>
+
+                <button class="btn" id="startGameBtn" style="display: block; margin: 1rem auto 0; width: 100%;">ゲーム開始</button>
+            </div>
+        </div>
+
+        <div id="quizScreen" class="screen">
+            <div class="quiz-layout">
+                <div class="quiz-main">
+                    <div class="quiz-header">
+                        <div class="round-info">
+                            問題 <span id="currentRound">1</span>
+                        </div>
+                        <div class="timer" id="timer">30</div>
+                    </div>
+
+                    <div class="question-section">
+                        <img id="questionImage" class="question-image" style="display: none;">
+                        <div class="question-text" id="questionText"></div>
+                        
+                        <div id="buzzerSection" class="buzzer-section">
+                            <button class="buzzer-btn" id="buzzerBtn">回答する</button>
+                        </div>
+
+                        <div id="answerSection" class="answer-section" style="display: none;">
+                            <div class="answer-input-area" id="answerDisplay"></div>
+                            <div class="choice-grid" id="choiceGrid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar">
+                    <div class="scoreboard">
+                        <h3>スコアボード</h3>
+                        <div id="scoreList"></div>
+                    </div>
+
+                    <div class="progress-box">
+                        <h3>回答状況</h3>
+                        <div id="answerProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsScreen" class="screen">
+            <div class="results-card">
+                <div class="trophy">🏆</div>
+                <div class="winner-name" id="winnerName"></div>
+                <div id="finalScores" style="margin: 1.5rem 0;"></div>
+                <div class="results-actions">
+                    <button class="btn btn-secondary" id="continueBtn">続ける</button>
+                    <button class="btn" id="endBtn">終了</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+(function() {
+    'use strict';
+
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioCtx = new AudioContext();
+
+    function playSound(freq, dur, type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, onValue, update, runTransaction } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        const firebaseConfig = {
+            databaseURL: "https://lolw-9f44d-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(freq, dur, type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = freq;
+            osc.type = type || 'sine';
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.start(audioCtx.currentTime);
+            osc.stop(audioCtx.currentTime + dur);
+        }
+
+        function playCorrect() {
+            playSound(523.25, 0.15);
+            setTimeout(() => playSound(659.25, 0.15), 150);
+            setTimeout(() => playSound(783.99, 0.3), 300);
+        }
+
+        function playWrong() {
+            playSound(200, 0.5, 'square');
+        }
+
+        function playClick() {
+            playSound(600, 0.1);
+        }
+
+    const championData = [
+        {id: "Aatrox", jp: "えいとろっくす"}, {id: "Ahri", jp: "あーり"}, {id: "Akali", jp: "あかり"},
+        {id: "Akshan", jp: "あくしゃん"}, {id: "Alistar", jp: "ありすたー"}, {id: "Amumu", jp: "あむむ"},
+        {id: "Anivia", jp: "あにう゛ぃあ"}, {id: "Annie", jp: "あにー"}, {id: "Aphelios", jp: "あふぇりおす"},
+        {id: "Ashe", jp: "あっしゅ"}, {id: "AurelionSol", jp: "おれりおんそる"}, {id: "Azir", jp: "あじーる"},
+        {id: "Bard", jp: "ばーど"}, {id: "Belveth", jp: "べるう゛ぇす"}, {id: "Blitzcrank", jp: "ぶりっつくらんく"},
+        {id: "Brand", jp: "ぶらんど"}, {id: "Braum", jp: "ぶらうむ"}, {id: "Caitlyn", jp: "けいとりん"},
+        {id: "Camille", jp: "かみーる"}, {id: "Cassiopeia", jp: "かしおぺあ"}, {id: "Chogath", jp: "ちょがす"},
+        {id: "Corki", jp: "こーき"}, {id: "Darius", jp: "だりうす"}, {id: "Diana", jp: "だいあな"},
+        {id: "Draven", jp: "どれいう゛ん"}, {id: "DrMundo", jp: "どくたーむんど"}, {id: "Ekko", jp: "えこー"},
+        {id: "Elise", jp: "えりす"}, {id: "Evelynn", jp: "いう゛りん"}, {id: "Ezreal", jp: "えずりある"},
+        {id: "Fiddlesticks", jp: "ふぃどるすてぃっくす"}, {id: "Fiora", jp: "ふぃおら"}, {id: "Fizz", jp: "ふぃず"},
+        {id: "Galio", jp: "がりお"}, {id: "Gangplank", jp: "がんぷらんく"}, {id: "Garen", jp: "がれん"},
+        {id: "Gnar", jp: "なー"}, {id: "Gragas", jp: "ぐらがす"}, {id: "Graves", jp: "ぐれいう゛す"},
+        {id: "Gwen", jp: "ぐうぇん"}, {id: "Hecarim", jp: "へかりむ"}, {id: "Heimerdinger", jp: "はいまーでぃんがー"},
+        {id: "Illaoi", jp: "いらおい"}, {id: "Irelia", jp: "いれりあ"}, {id: "Ivern", jp: "あいう゛ぁーん"},
+        {id: "Janna", jp: "じゃんな"}, {id: "JarvanIV", jp: "じゃーう゛ぁんふぉー"}, {id: "Jax", jp: "じゃっくす"},
+        {id: "Jayce", jp: "じぇいす"}, {id: "Jhin", jp: "じん"}, {id: "Jinx", jp: "じんくす"},
+        {id: "Kaisa", jp: "かいさ"}, {id: "Kalista", jp: "かりすた"}, {id: "Karma", jp: "かるま"},
+        {id: "Karthus", jp: "かーさす"}, {id: "Kassadin", jp: "かさでぃん"}, {id: "Katarina", jp: "かたりな"},
+        {id: "Kayle", jp: "けいる"}, {id: "Kayn", jp: "けいん"}, {id: "Kennen", jp: "けねん"},
+        {id: "Khazix", jp: "かじっくす"}, {id: "Kindred", jp: "きんどれっど"}, {id: "Kled", jp: "くれっど"},
+        {id: "KogMaw", jp: "こぐまう"}, {id: "KSante", jp: "けさんて"}, {id: "Leblanc", jp: "るぶらん"},
+        {id: "LeeSin", jp: "りーしん"}, {id: "Leona", jp: "れおな"}, {id: "Lillia", jp: "りりあ"},
+        {id: "Lissandra", jp: "りさんどら"}, {id: "Lucian", jp: "るしあん"}, {id: "Lulu", jp: "るる"},
+        {id: "Lux", jp: "るくす"}, {id: "Malphite", jp: "まるふぁいと"}, {id: "Malzahar", jp: "まるざはーる"},
+        {id: "Maokai", jp: "まおかい"}, {id: "MasterYi", jp: "ますたーいー"}, {id: "Milio", jp: "みりお"},
+        {id: "MissFortune", jp: "みすふぉーちゅん"}, {id: "Mordekaiser", jp: "もるでかいざー"}, {id: "Morgana", jp: "もるがな"},
+        {id: "Naafiri", jp: "なーふぃり"}, {id: "Nami", jp: "なみ"}, {id: "Nasus", jp: "なさす"},
+        {id: "Nautilus", jp: "のーちらす"}, {id: "Neeko", jp: "にーこ"}, {id: "Nidalee", jp: "にだりー"},
+        {id: "Nilah", jp: "にーら"}, {id: "Nocturne", jp: "のくたーん"}, {id: "Nunu", jp: "ぬぬ"},
+        {id: "Olaf", jp: "おらふ"}, {id: "Orianna", jp: "おりあな"}, {id: "Ornn", jp: "おーん"},
+        {id: "Pantheon", jp: "ぱんておん"}, {id: "Poppy", jp: "ぽっぴー"}, {id: "Pyke", jp: "ぱいく"},
+        {id: "Qiyana", jp: "きあな"}, {id: "Quinn", jp: "くいん"}, {id: "Rakan", jp: "らかん"},
+        {id: "Rammus", jp: "らむす"}, {id: "RekSai", jp: "れくさい"}, {id: "Rell", jp: "れる"},
+        {id: "Renata", jp: "れなーた"}, {id: "Renekton", jp: "れねくとん"}, {id: "Rengar", jp: "れんがー"},
+        {id: "Riven", jp: "りう゛ぇん"}, {id: "Rumble", jp: "らんぶる"}, {id: "Ryze", jp: "らいず"},
+        {id: "Samira", jp: "さみーら"}, {id: "Sejuani", jp: "せじゅあに"}, {id: "Senna", jp: "せな"},
+        {id: "Seraphine", jp: "せらふぃーん"}, {id: "Sett", jp: "せっと"}, {id: "Shaco", jp: "しゃこ"},
+        {id: "Shen", jp: "しぇん"}, {id: "Shyvana", jp: "しう゛ぁな"}, {id: "Singed", jp: "しんじど"},
+        {id: "Sion", jp: "さいおん"}, {id: "Sivir", jp: "しう゛ぃあ"}, {id: "Skarner", jp: "すかーなー"},
+        {id: "Sona", jp: "そな"}, {id: "Soraka", jp: "そらか"}, {id: "Swain", jp: "すうぇいん"},
+        {id: "Sylas", jp: "さいらす"}, {id: "Syndra", jp: "しんどら"}, {id: "TahmKench", jp: "たむけんち"},
+        {id: "Taliyah", jp: "たりや"}, {id: "Talon", jp: "たろん"}, {id: "Taric", jp: "たりっく"},
+        {id: "Teemo", jp: "てぃーも"}, {id: "Thresh", jp: "すれっしゅ"}, {id: "Tristana", jp: "とりすたな"},
+        {id: "Trundle", jp: "とらんどる"}, {id: "Tryndamere", jp: "とりんだめあ"}, {id: "TwistedFate", jp: "ついすてっどふぇいと"},
+        {id: "Twitch", jp: "とぅいっち"}, {id: "Udyr", jp: "うでぃあ"}, {id: "Urgot", jp: "あーごっと"},
+        {id: "Varus", jp: "う゛ぁるす"}, {id: "Vayne", jp: "う゛ぇいん"}, {id: "Veigar", jp: "う゛ぇいがー"},
+        {id: "Velkoz", jp: "う゛ぇるこず"}, {id: "Vex", jp: "う゛ぇっくす"}, {id: "Vi", jp: "う゛ぁい"},
+        {id: "Viego", jp: "う゛ぃえご"}, {id: "Viktor", jp: "う゛ぃくたー"}, {id: "Vladimir", jp: "う゛らでぃみーる"},
+        {id: "Volibear", jp: "う゛ぉりべあ"}, {id: "Warwick", jp: "わーうぃっく"}, {id: "Wukong", jp: "うーこん"},
+        {id: "Xayah", jp: "ざや"}, {id: "Xerath", jp: "ぜらす"}, {id: "XinZhao", jp: "しんじゃお"},
+        {id: "Yasuo", jp: "やすお"}, {id: "Yone", jp: "よね"}, {id: "Yorick", jp: "よりっく"},
+        {id: "Yuumi", jp: "ゆーみ"}, {id: "Zac", jp: "ざっく"}, {id: "Zed", jp: "ぜど"},
+        {id: "Zeri", jp: "ぜり"}, {id: "Ziggs", jp: "じぐす"}, {id: "Zilean", jp: "じりあん"},
+        {id: "Zoe", jp: "ぞーい"}, {id: "Zyra", jp: "ざいら"}
+    ];
+
+    const questionDB = {
+        champion: [],
+        skill: [
+            {q: "ヤスオのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "レオナのQスキルの効果は", a: "すたん", choices: ["すたん", "のっくあっぷ", "すねあ", "さいれんす"]},
+            {q: "モルガナのQスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "すろう", "のっくあっぷ"]},
+            {q: "アッシュのRスキルの効果は", a: "すたん", choices: ["すたん", "すねあ", "すろう", "さいれんす"]},
+            {q: "マルファイトのRスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "ジャンナのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "さいれんす"]},
+            {q: "ソラカのEスキルの効果は", a: "さいれんす", choices: ["さいれんす", "すたん", "すねあ", "すろう"]},
+            {q: "ブリッツのQスキルの効果は", a: "ひっぱる", choices: ["ひっぱる", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "スレッシュのQスキルの効果は", a: "ひっぱる", choices: ["ひっぱる", "すたん", "すねあ", "すろう"]},
+            {q: "ナウティラスのQスキルの効果は", a: "ひっぱる", choices: ["ひっぱる", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "シンドラのEスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "ドレイヴンのEスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すろう"]},
+            {q: "ヴェインのEスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "すたん", "すねあ", "すろう"]},
+            {q: "アジールのRスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "リーシンのRスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すろー"]},
+            {q: "ジンクスのEスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "すろう", "さいれんす"]},
+            {q: "ケイトリンのWスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "すろう", "のっくあっぷ"]},
+            {q: "ナミのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "ヤスオのRスキルの必要条件は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "アリスターのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "カシオペアのWスキルの効果は", a: "ぐらうんど", choices: ["ぐらうんど", "すたん", "すねあ", "すろう"]},
+            {q: "ポッピーのWスキルの効果は", a: "だっしゅぶろっく", choices: ["だっしゅぶろっく", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "ヴェックスのパッシブの効果は", a: "だっしゅを妨害", choices: ["だっしゅを妨害", "すたん", "すねあ", "すろう"]},
+            {q: "カルマのWスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "すろう", "さいれんす"]},
+            {q: "ルクスのQスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "のっくあっぷ", "すろう"]},
+            {q: "モルデカイザーのEスキルの効果は", a: "ひっぱる", choices: ["ひっぱる", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "スウェインのパッシブの効果は", a: "ひっぱる", choices: ["ひっぱる", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "アーゴットのRスキルの効果は", a: "ひっぱる", choices: ["ひっぱる", "のっくばっく", "すたん", "すねあ"]},
+            {q: "ベルヴェスのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "グラガスのRスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すねあ"]},
+            {q: "ジェイスのEスキルの効果は", a: "のっくばっく", choices: ["のっくばっく", "のっくあっぷ", "すたん", "すろう"]},
+            {q: "タロンのEスキルの効果は", a: "かべこえ", choices: ["かべこえ", "だっしゅ", "てれぽーと", "じゃんぷ"]},
+            {q: "ケインのEスキルの効果は", a: "かべとおり", choices: ["かべとおり", "かべこえ", "だっしゅ", "てれぽーと"]},
+            {q: "バードのEスキルの効果は", a: "かべぽーたる", choices: ["かべぽーたる", "かべこえ", "てれぽーと", "だっしゅ"]},
+            {q: "リサンドラのWスキルの効果は", a: "すねあ", choices: ["すねあ", "すたん", "すろう", "さいれんす"]},
+            {q: "アニビアのQスキルの効果は", a: "すたん", choices: ["すたん", "すねあ", "すろう", "のっくあっぷ"]},
+            {q: "ブランドのQスキルの効果は", a: "すたん", choices: ["すたん", "すねあ", "すろう", "さいれんす"]},
+            {q: "ソナのRスキルの効果は", a: "すたん", choices: ["すたん", "すねあ", "さいれんす", "すろう"]},
+            {q: "カーサスのWスキルの効果は", a: "すろう", choices: ["すろう", "すたん", "すねあ", "さいれんす"]},
+            {q: "チョガスのQスキルの効果は", a: "のっくあっぷ", choices: ["のっくあっぷ", "すたん", "すねあ", "すろう"]},
+            {q: "ランブルのEスキルの効果は", a: "すろう", choices: ["すろう", "すたん", "すねあ", "さいれんす"]}
+        ],
+        lore: [
+            {q: "アーケインでジンクスの本名は", a: "ぱうだー", choices: ["ぱうだー", "ばいおれっと", "くらぎっど", "えこー"]},
+            {q: "アーケインでヴァイの本名は", a: "ばいおれっと", choices: ["ばいおれっと", "ぱうだー", "くらぎっど", "じんくす"]},
+            {q: "アーケインでジンクスとヴァイの関係は", a: "しまい", choices: ["しまい", "ともだち", "てき", "みちのひと"]},
+            {q: "アーケインの舞台となる都市は", a: "ぴるとおーう゛ぁー", choices: ["ぴるとおーう゛ぁー", "でまーしあ", "のくさす", "あいおにあ"]},
+            {q: "ヤスオの故郷の地域は", a: "あいおにあ", choices: ["あいおにあ", "でまーしあ", "のくさす", "ふれるよるど"]},
+            {q: "ガレンとルクスの出身地は", a: "でまーしあ", choices: ["でまーしあ", "のくさす", "あいおにあ", "ぴるとおーう゛ぁー"]},
+            {q: "ダリウスとドレイヴンの関係は", a: "きょうだい", choices: ["きょうだい", "ともだち", "てき", "みちのひと"]},
+            {q: "アーリの種族は", a: "きつね", choices: ["きつね", "おおかみ", "りゅう", "にんげん"]},
+            {q: "ナサスとレネクトンの種族は", a: "しゅうりま", choices: ["しゅうりま", "でまーしあ", "あいおにあ", "よーどる"]},
+            {q: "ティーモの種族は", a: "よーどる", choices: ["よーどる", "にんげん", "えるふ", "どわーふ"]},
+            {q: "ジンクスとヴァイが育った場所は", a: "ぞーん", choices: ["ぞーん", "ぴるとおーう゛ぁー", "でまーしあ", "のくさす"]},
+            {q: "アーケインでジンクスを育てた人物は", a: "しるこ", choices: ["しるこ", "う゛ぁんだー", "じぇいす", "う゛ぃくたー"]},
+            {q: "アーケインでエコーの武器は", a: "じかんそうち", choices: ["じかんそうち", "けん", "じゅう", "おの"]},
+            {q: "アーケインでジェイスが作った道具は", a: "へくすてっくげーと", choices: ["へくすてっくげーと", "じかんそうち", "ろぼっと", "ひこうき"]},
+            {q: "ゼドとシェンの関係は", a: "きょうだいでし", choices: ["きょうだいでし", "ともだち", "てき", "みちのひと"]},
+            {q: "ヤスオとヨネの関係は", a: "きょうだい", choices: ["きょうだい", "ともだち", "てき", "みちのひと"]},
+            {q: "ガレンとカタリナの関係は", a: "てきどうしのこい", choices: ["てきどうしのこい", "きょうだい", "ともだち", "てき"]},
+            {q: "ラカンとザヤの関係は", a: "こいびと", choices: ["こいびと", "きょうだい", "ともだち", "てき"]},
+            {q: "アッシュとトリンダメアの関係は", a: "ふうふ", choices: ["ふうふ", "きょうだい", "ともだち", "てき"]},
+            {q: "ルシアンとセナの関係は", a: "ふうふ", choices: ["ふうふ", "きょうだい", "ともだち", "てき"]}
+        ],
+        combo: [
+            {q: "ヤスオの基本コンボは", a: "E→Q→R", choices: ["E→Q→R", "Q→E→R", "R→E→Q", "Q→R→E"]},
+            {q: "ゼドのワンコンボは", a: "W→E→Q→R", choices: ["W→E→Q→R", "R→W→Q→E", "Q→W→E→R", "E→W→R→Q"]},
+            {q: "リーシンのインセックは", a: "Q→Q→R→F", choices: ["Q→Q→R→F", "R→Q→F", "F→R→Q", "W→R→Q"]},
+            {q: "アーリのバーストコンボは", a: "E→W→Q→R", choices: ["E→W→Q→R", "Q→E→W→R", "R→E→Q→W", "W→E→R→Q"]},
+            {q: "アニーのスタンコンボは", a: "R→W→Q", choices: ["R→W→Q", "Q→W→R", "W→Q→R", "Q→R→W"]},
+            {q: "シンドラのワンコンボは", a: "Q→E→R", choices: ["Q→E→R", "E→Q→R", "R→Q→E", "Q→R→E"]},
+            {q: "レオナのフルコンボは", a: "E→Q→R", choices: ["E→Q→R", "Q→E→R", "R→E→Q", "Q→R→E"]},
+            {q: "マルファイトのエンゲージは", a: "R→E→Q", choices: ["R→E→Q", "E→R→Q", "Q→R→E", "R→Q→E"]},
+            {q: "カタリナのリセットコンボは", a: "E→W→Q→R", choices: ["E→W→Q→R", "Q→W→E→R", "R→E→Q→W", "W→E→R→Q"]},
+            {q: "フィズのバーストコンボは", a: "Q→W→E→R", choices: ["Q→W→E→R", "R→Q→W→E", "E→Q→W→R", "W→Q→R→E"]},
+            {q: "アカリのコンボは", a: "Q→E→R→AA", choices: ["Q→E→R→AA", "E→Q→R→AA", "R→E→Q→AA", "Q→R→E→AA"]},
+            {q: "ダイアナのコンボは", a: "Q→R→W→E", choices: ["Q→R→W→E", "R→Q→W→E", "W→Q→R→E", "Q→W→R→E"]},
+            {q: "エコーのコンボは", a: "E→Q→AA→R", choices: ["E→Q→AA→R", "Q→E→AA→R", "R→E→Q→AA", "Q→AA→E→R"]},
+            {q: "カサディンのコンボは", a: "R→E→Q→W", choices: ["R→E→Q→W", "E→R→Q→W", "Q→R→E→W", "R→Q→E→W"]},
+            {q: "ブラッドミアのコンボは", a: "E→Q→R→W", choices: ["E→Q→R→W", "Q→E→R→W", "R→E→Q→W", "Q→R→E→W"]}
+        ],
+        cooldown: [
+            {q: "フラッシュのクールダウンは", a: "5ふん", choices: ["5ふん", "3ふん", "7ふん", "4ふん"]},
+            {q: "イグナイトのクールダウンは", a: "3ふん", choices: ["3ふん", "5ふん", "2ふん", "4ふん"]},
+            {q: "テレポート序盤のクールダウンは", a: "6ふん", choices: ["6ふん", "5ふん", "7ふん", "4ふん"]},
+            {q: "ヒールのクールダウンは", a: "4ふん", choices: ["4ふん", "3ふん", "5ふん", "2ふん"]},
+            {q: "バリアのクールダウンは", a: "3ふん", choices: ["3ふん", "4ふん", "5ふん", "2ふん"]},
+            {q: "クレンズのクールダウンは", a: "3ふん30びょう", choices: ["3ふん30びょう", "3ふん", "4ふん", "2ふん30びょう"]},
+            {q: "ゴーストのクールダウンは", a: "3ふん30びょう", choices: ["3ふん30びょう", "3ふん", "4ふん", "5ふん"]},
+            {q: "イグゾーストのクールダウンは", a: "3ふん30びょう", choices: ["3ふん30びょう", "3ふん", "4ふん", "5ふん"]},
+            {q: "スマイトのクールダウンは", a: "90びょう", choices: ["90びょう", "60びょう", "120びょう", "75びょう"]},
+            {q: "マークのクールダウンは", a: "80びょう", choices: ["80びょう", "60びょう", "90びょう", "100びょう"]}
+        ],
+        proplay: [
+            {q: "2023年ワールドの優勝チームは", a: "T1", choices: ["T1", "JDG", "WBG", "GEN"]},
+            {q: "2022年ワールドの優勝チームは", a: "DRX", choices: ["DRX", "T1", "GEN", "JDG"]},
+            {q: "2021年ワールドの優勝チームは", a: "EDG", choices: ["EDG", "DK", "T1", "GEN"]},
+            {q: "2020年ワールドの優勝チームは", a: "DWG", choices: ["DWG", "SN", "G2", "TES"]},
+            {q: "2019年ワールドの優勝チームは", a: "FPX", choices: ["FPX", "G2", "SKT", "IG"]},
+            {q: "2018年ワールドの優勝チームは", a: "IG", choices: ["IG", "FNC", "G2", "RNG"]},
+            {q: "Season1ワールドの優勝チームは", a: "FNC", choices: ["FNC", "AAA", "TSM", "CLG"]},
+            {q: "最多ワールド優勝チームは", a: "T1", choices: ["T1", "GEN", "FNC", "EDG"]},
+            {q: "Fakerの本名は", a: "いさんひょく", choices: ["いさんひょく", "ぱくじうん", "きむじょんぎょん", "ちぇうじ"]},
+            {q: "LCKの前身リーグ名は", a: "OGN", choices: ["OGN", "LPL", "LCS", "LEC"]},
+
+    champions.forEach(c => {
+        questionDB.champion.push({
+            q: "このチャンピオンは誰ですか",
+            a: c.jp,
+            championId: c.id
+        });
+    });
+
+    let state = {
+        roomCode: null,
+        playerName: null,
+        isHost: false,
+        currentAnswer: '',
+        hasAnswered: false,
+        isSuspended: false,
+        unsubscribe: null
+    };
+
+    let timerInterval = null;
+    let scoreCalculated = false;
+
+    function generateRoomCode() {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        for (let i = 0; i < 6; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+    }
+
+    function showScreen(screenId) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenId).classList.add('active');
+    }
+
+    function updateConnectionStatus(connected) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        if (connected) {
+            dot.classList.remove('disconnected');
+            text.textContent = 'オンライン';
+        } else {
+            dot.classList.add('disconnected');
+            text.textContent = '切断';
+        }
+    }
+
+    async function createRoom() {
+        const playerName = document.getElementById('playerName').value.trim();
+        if (!playerName) {
+            alert('プレイヤー名を入力してください');
+            return;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        
+        const roomCode = generateRoomCode();
+        state.roomCode = roomCode;
+        state.playerName = playerName;
+        state.isHost = true;
+
+        await set(ref(database, `rooms/${roomCode}`), {
+            host: playerName,
+            players: {[playerName]: {name: playerName, isHost: true}},
+            categories: ['champion'],
+            winPoints: 10,
+            mistakesAllowed: 2,
+            answerTime: 30,
+            gameStarted: false,
+            currentRound: 0,
+            currentQuestion: null,
+            scores: {[playerName]: 0},
+            mistakes: {[playerName]: 0},
+            suspended: {[playerName]: false},
+            usedQuestions: [],
+            playerAnswers: {},
+            scoreCalculated: false,
+            timestamp: Date.now()
+        });
+
+        showLobby();
+        listenToRoom();
+    }
+
+    function showJoinRoom() {
+        showScreen('joinScreen');
+    }
+
+    async function joinRoom() {
+        const playerName = document.getElementById('playerName').value.trim();
+        const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+
+        if (!playerName) {
+            alert('プレイヤー名を入力してください');
+            return;
+        }
+        if (!roomCode || roomCode.length !== 6) {
+            alert('6桁のルームコードを入力してください');
+            return;
+        }
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        const roomRef = ref(database, `rooms/${roomCode}`);
+        const snapshot = await get(roomRef);
+        
+        if (!snapshot.exists()) {
+            alert('ルームが見つかりません');
+            return;
+        }
+
+        const roomData = snapshot.val();
+        if (roomData.players && roomData.players[playerName]) {
+            alert('この名前は既に使用されています');
+            return;
+        }
+
+        state.roomCode = roomCode;
+        state.playerName = playerName;
+        state.isHost = false;
+
+        await update(ref(database, `rooms/${roomCode}/players/${playerName}`), {
+            name: playerName,
+            isHost: false
+        });
+        await update(ref(database, `rooms/${roomCode}/scores`), {[playerName]: 0});
+        await update(ref(database, `rooms/${roomCode}/mistakes`), {[playerName]: 0});
+        await update(ref(database, `rooms/${roomCode}/suspended`), {[playerName]: false});
+
+        showLobby();
+        listenToRoom();
+    }
+
+    function showHome() {
+        showScreen('homeScreen');
+    }
+
+    function showLobby() {
+        showScreen('lobbyScreen');
+        document.getElementById('roomCode').textContent = state.roomCode;
+        
+        if (state.isHost) {
+            document.getElementById('hostSettings').style.display = 'block';
+            document.getElementById('hostSettings2').style.display = 'grid';
+            document.getElementById('hostSettings3').style.display = 'block';
+            document.getElementById('startGameBtn').style.display = 'block';
+        } else {
+            document.getElementById('hostSettings').style.display = 'none';
+            document.getElementById('hostSettings2').style.display = 'none';
+            document.getElementById('hostSettings3').style.display = 'none';
+            document.getElementById('startGameBtn').style.display = 'none';
+        }
+
+        updateConnectionStatus(true);
+    }
+
+    function listenToRoom() {
+        const roomRef = ref(database, `rooms/${state.roomCode}`);
+        const unsubscribe = onValue(roomRef, (snapshot) => {
+            if (!snapshot.exists()) {
+                updateConnectionStatus(false);
+                return;
+            }
+
+            updateConnectionStatus(true);
+            const roomData = snapshot.val();
+            
+            if (roomData.players) {
+                updatePlayersList(Object.values(roomData.players));
+            }
+
+            const quizActive = document.getElementById('quizScreen').classList.contains('active');
+            
+            if (roomData.gameStarted && !quizActive) {
+                showScreen('quizScreen');
+                if (state.isHost) {
+                    setTimeout(() => nextQuestion(roomData), 500);
+                }
+            }
+
+            if (quizActive) {
+                syncGameState(roomData);
+            }
+
+            if (roomData.showResults) {
+                showResults(roomData);
+            }
+        });
+
+        state.unsubscribe = unsubscribe;
+    }
+
+    function updatePlayersList(players) {
+        const list = document.getElementById('playersList');
+        list.innerHTML = '';
+        players.forEach(player => {
+            const div = document.createElement('div');
+            div.style.cssText = 'display: flex; align-items: center; padding: 0.6rem; margin-bottom: 0.4rem; background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 3px solid ' + (player.isHost ? 'var(--gold)' : 'var(--blue)');
+            div.innerHTML = `<div style="width: 35px; height: 35px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; color: var(--dark-blue); margin-right: 0.8rem;">${player.name.charAt(0).toUpperCase()}</div>` +
+                           `<div style="flex: 1; font-weight: 700; font-size: 0.9rem;">${player.name}</div>` +
+                           (player.isHost ? '<span style="background: var(--gold); color: var(--dark-blue); padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.75rem; font-weight: 700;">HOST</span>' : '');
+            list.appendChild(div);
+        });
+    }
+
+    function copyRoomCode() {
+        navigator.clipboard.writeText(state.roomCode);
+        const btn = document.getElementById('copyCodeBtn');
+        const orig = btn.textContent;
+        btn.textContent = '✓ コピー完了';
+        setTimeout(() => btn.textContent = orig, 2000);
+    }
+
+    document.getElementById('categoryGrid').addEventListener('click', e => {
+        if (!state.isHost) return;
+        const option = e.target.closest('.category-option');
+        if (!option) return;
+        option.classList.toggle('selected');
+    });
+
+    async function startGameFromLobby() {
+        if (!state.isHost) return;
+        
+        const selectedCategories = [];
+        document.querySelectorAll('.category-option.selected').forEach(opt => {
+            selectedCategories.push(opt.getAttribute('data-category'));
+        });
+        
+        if (selectedCategories.length === 0) {
+            alert('少なくとも1つの出題範囲を選択してください');
+            return;
+        }
+
+        const winPoints = parseInt(document.getElementById('winPoints').value);
+        const mistakesAllowed = parseInt(document.getElementById('mistakesAllowed').value);
+        const answerTime = parseInt(document.getElementById('answerTime').value);
+
+        await update(ref(database, `rooms/${state.roomCode}`), {
+            categories: selectedCategories,
+            winPoints: winPoints,
+            mistakesAllowed: mistakesAllowed,
+            answerTime: answerTime,
+            gameStarted: true,
+            currentRound: 1,
+            usedQuestions: [],
+            scoreCalculated: false,
+            timestamp: Date.now()
+        });
+    }
+
+    function getRandomUnusedQuestion(roomData) {
+        let allQuestions = [];
+        roomData.categories.forEach(cat => {
+            if (questionDB[cat]) {
+                allQuestions = allQuestions.concat(questionDB[cat]);
+            }
+        });
+
+        const usedQuestions = roomData.usedQuestions || [];
+        const available = allQuestions.filter(q => {
+            const key = JSON.stringify({q: q.q, a: q.a});
+            return !usedQuestions.includes(key);
+        });
+
+        if (available.length === 0) {
+            return allQuestions[Math.floor(Math.random() * allQuestions.length)];
+        }
+        return available[Math.floor(Math.random() * available.length)];
+    }
+
+    async function nextQuestion(roomData) {
+        if (!state.isHost) return;
+
+        const scores = roomData.scores || {};
+        const hasWinner = Object.values(scores).some(score => score >= roomData.winPoints);
+        
+        if (hasWinner) {
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                showResults: true
+            });
+            return;
+        }
+
+        const question = getRandomUnusedQuestion(roomData);
+        const key = JSON.stringify({q: question.q, a: question.a});
+        const usedQuestions = [...(roomData.usedQuestions || []), key];
+
+        await update(ref(database, `rooms/${state.roomCode}`), {
+            currentQuestion: question,
+            usedQuestions: usedQuestions,
+            playerAnswers: {},
+            scoreCalculated: false,
+            timestamp: Date.now()
+        });
+
+        scoreCalculated = false;
+        startTimer(roomData.answerTime || 30);
+    }
+
+    function displayQuestion(question) {
+        document.getElementById('questionText').textContent = question.q;
+        
+        const imgEl = document.getElementById('questionImage');
+        if (question.championId) {
+            imgEl.src = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${question.championId}_0.jpg`;
+            imgEl.style.display = 'block';
+        } else {
+            imgEl.style.display = 'none';
+        }
+
+        state.currentAnswer = '';
+        state.hasAnswered = false;
+        document.getElementById('buzzerSection').style.display = 'block';
+        document.getElementById('answerSection').style.display = 'none';
+        document.getElementById('buzzerBtn').disabled = state.isSuspended;
+        document.getElementById('answerProgress').innerHTML = '';
+    }
+
+    async function buzzerPressed() {
+        if (state.hasAnswered || state.isSuspended) return;
+        playClick();
+
+        state.hasAnswered = false;
+        
+        document.getElementById('buzzerSection').style.display = 'none';
+        document.getElementById('answerSection').style.display = 'flex';
+        document.getElementById('answerDisplay').textContent = '';
+        state.currentAnswer = '';
+        
+        const roomRef = ref(database, `rooms/${state.roomCode}`);
+        const snapshot = await get(roomRef);
+        const roomData = snapshot.val();
+        
+        generateChoices(roomData.currentQuestion);
+    }
+
+    function syncGameState(roomData) {
+        if (!roomData.currentQuestion) return;
+
+        document.getElementById('currentRound').textContent = roomData.currentRound || 1;
+        
+        state.isSuspended = roomData.suspended && roomData.suspended[state.playerName];
+        
+        displayQuestion(roomData.currentQuestion);
+        updateLiveProgress(roomData);
+        updateScoreboard(roomData);
+
+        const players = Object.values(roomData.players || {});
+        const playerAnswers = roomData.playerAnswers || {};
+        const suspended = roomData.suspended || {};
+        
+        const allAnswered = players.every(p => playerAnswers[p.name] || suspended[p.name]);
+
+        if (allAnswered && state.isHost && !roomData.scoreCalculated && Object.keys(playerAnswers).length > 0) {
+            clearInterval(timerInterval);
+            calculateScores(roomData);
+            setTimeout(() => {
+                update(ref(database, `rooms/${state.roomCode}/currentRound`), 
+                    (roomData.currentRound || 1) + 1);
+                nextQuestion(roomData);
+            }, 3000);
+        }
+    }
+
+    function updateLiveProgress(roomData) {
+        const progress = document.getElementById('answerProgress');
+        progress.innerHTML = '';
+        
+        const players = Object.values(roomData.players || {});
+        const playerAnswers = roomData.playerAnswers || {};
+        const suspended = roomData.suspended || {};
+        
+        players.forEach(player => {
+            const div = document.createElement('div');
+            const hasAnswered = playerAnswers[player.name];
+            const isSuspended = suspended[player.name];
+            div.className = 'progress-item' + (hasAnswered ? ' answered' : ' waiting');
+            const badgeClass = hasAnswered ? 'answered-badge' : 'waiting-badge';
+            const badgeText = isSuspended ? '🚫 休み' : (hasAnswered ? '✓ 回答済' : '待機中');
+            div.innerHTML = `<div class="progress-name">${player.name}</div>` +
+                           `<div class="progress-badge ${badgeClass}">${badgeText}</div>`;
+            progress.appendChild(div);
+        });
+    }
+
+    function generateChoices(question) {
+        if (question.choices) {
+            renderChoices(question.choices);
+        } else if (question.championId) {
+            generateHiraganaChoices(question.a, 0);
+        }
+    }
+
+    function renderChoices(choices) {
+        const grid = document.getElementById('choiceGrid');
+        grid.innerHTML = '';
+        choices.forEach(choice => {
+            const btn = document.createElement('button');
+            btn.className = 'choice-btn';
+            btn.textContent = choice;
+            btn.onclick = () => {
+                if (!state.hasAnswered) {
+                    selectChoice(choice, true);
+                }
+            };
+            grid.appendChild(btn);
+        });
+    }
+
+    function generateHiraganaChoices(answer, position) {
+        if (position >= answer.length) return;
+
+        const correctChar = answer.charAt(position);
+        const allChars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゃゅょっー';
+        const choices = [correctChar];
+
+        while (choices.length < 4) {
+            const randomChar = allChars.charAt(Math.floor(Math.random() * allChars.length));
+            if (!choices.includes(randomChar) && randomChar !== correctChar) {
+                choices.push(randomChar);
+            }
+        }
+
+        for (let i = choices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [choices[i], choices[j]] = [choices[j], choices[i]];
+        }
+
+        renderChoices(choices);
+    }
+
+    async function selectChoice(char, isFinal) {
+        if (state.hasAnswered) return;
+        playClick();
+        state.currentAnswer += char;
+        document.getElementById('answerDisplay').textContent = state.currentAnswer;
+
+        const roomRef = ref(database, `rooms/${state.roomCode}`);
+        const snapshot = await get(roomRef);
+        const roomData = snapshot.val();
+        const question = roomData.currentQuestion;
+
+        if (isFinal || state.currentAnswer.length === question.a.length) {
+            submitAnswer(question.a);
+        } else {
+            generateHiraganaChoices(question.a, state.currentAnswer.length);
+        }
+    }
+
+    async function submitAnswer(correctAnswer) {
+        if (state.hasAnswered) return;
+        state.hasAnswered = true;
+
+        const answer = state.currentAnswer;
+        const correct = answer === correctAnswer;
+
+        await runTransaction(ref(database, `rooms/${state.roomCode}/playerAnswers/${state.playerName}`), () => {
+            return {
+                answer: answer,
+                correct: correct,
+                timestamp: Date.now()
+            };
+        });
+
+        if (!correct) {
+            await runTransaction(ref(database, `rooms/${state.roomCode}/mistakes/${state.playerName}`), (current) => {
+                return (current || 0) + 1;
+            });
+        }
+
+        document.querySelectorAll('.choice-btn').forEach(btn => btn.disabled = true);
+        document.getElementById('answerSection').style.display = 'none';
+
+        if (correct) {
+            playCorrect();
+        } else {
+            playWrong();
+        }
+    }
+
+    function startTimer(seconds) {
+        let timeLeft = seconds;
+        const timerEl = document.getElementById('timer');
+        timerEl.textContent = timeLeft;
+        timerEl.classList.remove('warning');
+
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            timerEl.textContent = timeLeft;
+
+            if (timeLeft <= 10) {
+                timerEl.classList.add('warning');
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                if (state.isHost) {
+                    get(ref(database, `rooms/${state.roomCode}`)).then(snapshot => {
+                        const roomData = snapshot.val();
+                        if (!roomData.scoreCalculated) {
+                            calculateScores(roomData);
+                            setTimeout(() => {
+                                update(ref(database, `rooms/${state.roomCode}/currentRound`), 
+                                    (roomData.currentRound || 1) + 1);
+                                nextQuestion(roomData);
+                            }, 3000);
+                        }
+                    });
+                }
+            }
+        }, 1000);
+    }
+
+    async function calculateScores(roomData) {
+        if (scoreCalculated) return;
+        scoreCalculated = true;
+
+        await update(ref(database, `rooms/${state.roomCode}/scoreCalculated`), true);
+
+        const playerAnswers = roomData.playerAnswers || {};
+        const correctAnswers = Object.entries(playerAnswers)
+            .filter(([_, ans]) => ans.correct)
+            .sort((a, b) => a[1].timestamp - b[1].timestamp);
+
+        const scores = {...(roomData.scores || {})};
+        const mistakes = roomData.mistakes || {};
+        const mistakesAllowed = roomData.mistakesAllowed || 2;
+        const suspended = {...(roomData.suspended || {})};
+
+        if (correctAnswers.length > 0) {
+            const [firstPlayer, _] = correctAnswers[0];
+            scores[firstPlayer] = (scores[firstPlayer] || 0) + 2;
+            
+            for (let i = 1; i < correctAnswers.length; i++) {
+                const [playerName, _] = correctAnswers[i];
+                scores[playerName] = (scores[playerName] || 0) + 1;
+            }
+        }
+
+        Object.keys(playerAnswers).forEach(playerName => {
+            const ans = playerAnswers[playerName];
+            if (!ans.correct) {
+                const mistakeCount = mistakes[playerName] || 0;
+                
+                if (mistakeCount > mistakesAllowed) {
+                    if (scores[playerName] > 0) {
+                        scores[playerName] = Math.max(0, scores[playerName] - 1);
+                    } else {
+                        suspended[playerName] = true;
+                    }
+                }
+            }
+        });
+
+        Object.keys(suspended).forEach(playerName => {
+            if (suspended[playerName]) suspended[playerName] = false;
+        });
+
+        await update(ref(database, `rooms/${state.roomCode}`), {
+            scores: scores,
+            suspended: suspended
+        });
+    }
+
+    function updateScoreboard(roomData) {
+        const scoreList = document.getElementById('scoreList');
+        scoreList.innerHTML = '';
+
+        const players = Object.values(roomData.players || {});
+        const scores = roomData.scores || {};
+        const mistakes = roomData.mistakes || {};
+        const suspended = roomData.suspended || {};
+
+        const sortedPlayers = players.sort((a, b) => 
+            (scores[b.name] || 0) - (scores[a.name] || 0)
+        );
+
+        sortedPlayers.forEach((player, index) => {
+            const div = document.createElement('div');
+            const isSuspended = suspended[player.name];
+            div.className = 'score-item' + (index === 0 ? ' first' : '') + (isSuspended ? ' suspended' : '');
+            const mistakeCount = mistakes[player.name] || 0;
+            div.innerHTML = `<span class="score-name">${player.name}${isSuspended ? ' 🚫' : ''}</span>` +
+                           `<span class="score-points">${scores[player.name] || 0}pt</span>`;
+            if (mistakeCount > 0) {
+                const mistakesDiv = document.createElement('div');
+                mistakesDiv.className = 'mistakes-info';
+                mistakesDiv.textContent = `お手付き: ${mistakeCount}/${roomData.mistakesAllowed}`;
+                div.appendChild(mistakesDiv);
+            }
+            scoreList.appendChild(div);
+        });
+    }
+
+    function showResults(roomData) {
+        showScreen('resultsScreen');
+
+        const players = Object.values(roomData.players || {});
+        const scores = roomData.scores || {};
+        const sortedPlayers = players.sort((a, b) => (scores[b.name] || 0) - (scores[a.name] || 0));
+
+        document.getElementById('winnerName').textContent = `🎉 ${sortedPlayers[0].name} 優勝! 🎉`;
+
+        const finalScores = document.getElementById('finalScores');
+        finalScores.innerHTML = '';
+        sortedPlayers.forEach((player, index) => {
+            const div = document.createElement('div');
+            div.style.cssText = 'font-size: 1.1rem; padding: 0.8rem; margin: 0.4rem 0; background: rgba(255, 255, 255, 0.05); border-radius: 8px;';
+            div.innerHTML = `<span style="display: inline-block; width: 35px; height: 35px; background: var(--gold); color: var(--dark-blue); border-radius: 50%; line-height: 35px; margin-right: 0.8rem; font-weight: 700; text-align: center;">${index + 1}</span>` +
+                           `${player.name}: ${scores[player.name] || 0}pt`;
+            finalScores.appendChild(div);
+        });
+
+        playCorrect();
+        setTimeout(playCorrect, 300);
+        setTimeout(playCorrect, 600);
+    }
+
+    async function continueGame() {
+        if (!state.isHost) return;
+
+        const roomRef = ref(database, `rooms/${state.roomCode}`);
+        const snapshot = await get(roomRef);
+        const roomData = snapshot.val();
+
+        const players = Object.values(roomData.players || {});
+        const resetScores = {};
+        const resetMistakes = {};
+        const resetSuspended = {};
+        players.forEach(p => {
+            resetScores[p.name] = 0;
+            resetMistakes[p.name] = 0;
+            resetSuspended[p.name] = false;
+        });
+
+        await update(roomRef, {
+            showResults: false,
+            gameStarted: true,
+            currentRound: 1,
+            usedQuestions: [],
+            scores: resetScores,
+            mistakes: resetMistakes,
+            suspended: resetSuspended,
+            playerAnswers: {},
+            scoreCalculated: false,
+            timestamp: Date.now()
+        });
+
+        showScreen('quizScreen');
+        setTimeout(() => {
+            get(roomRef).then(snapshot => nextQuestion(snapshot.val()));
+        }, 500);
+    }
+
+    function endGame() {
+        if (state.unsubscribe) {
+            state.unsubscribe();
+        }
+        location.reload();
+    }
+
+    document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+    document.getElementById('joinRoomBtn').addEventListener('click', showJoinRoom);
+    document.getElementById('backToHomeBtn').addEventListener('click', showHome);
+    document.getElementById('joinBtn').addEventListener('click', joinRoom);
+    document.getElementById('copyCodeBtn').addEventListener('click', copyRoomCode);
+    document.getElementById('startGameBtn').addEventListener('click', startGameFromLobby);
+    document.getElementById('buzzerBtn').addEventListener('click', buzzerPressed);
+    document.getElementById('continueBtn').addEventListener('click', continueGame);
+    document.getElementById('endBtn').addEventListener('click', endGame);
+    </script>
+</body>
+</html>
