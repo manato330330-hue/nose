@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LoLクイズ - オンライン対戦</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Noto+Sans+JP:wght@400;700&display=swap');
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --gold: #C89B3C; --dark-blue: #0A1428; --blue: #0BC4E2;
+            --purple: #A855F7; --red: #EF4444; --green: #10B981; --orange: #F97316;
+        }
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #0A1428 0%, #1a2744 50%, #0A1428 100%);
+            color: white; min-height: 100vh; overflow-x: hidden;
+        }
+        body::before {
+            content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle at 20% 80%, rgba(168, 85, 247, 0.15) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(11, 196, 226, 0.15) 0%, transparent 50%);
+            pointer-events: none; z-index: 0;
+        }
+        .container { max-width: 100vw; min-height: 100vh; padding: 1rem; position: relative; z-index: 1; }
+        h1 { font-family: 'Orbitron', sans-serif; font-size: clamp(1.5rem, 4vw, 2rem); text-align: center; margin-bottom: 0.3rem;
+            background: linear-gradient(135deg, var(--gold) 0%, var(--blue) 100%);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+            text-transform: uppercase; letter-spacing: 2px; }
+        .subtitle { text-align: center; color: var(--blue); font-size: clamp(0.8rem, 2vw, 1rem); margin-bottom: 1rem; letter-spacing: 1px; }
+        .screen { display: none; }
+        .screen.active { display: block; }
+        .setup-card, .lobby-card {
+            background: rgba(26, 39, 68, 0.8); border: 2px solid var(--gold); border-radius: 15px;
+            padding: 1.5rem; backdrop-filter: blur(10px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 700px; margin: 0 auto; max-height: 85vh; overflow-y: auto;
+        }
+        .input-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.4rem; color: var(--gold); font-weight: 700; font-size: 0.9rem; }
+        input, select { width: 100%; padding: 0.6rem; background: rgba(10, 20, 40, 0.7); border: 2px solid var(--blue);
+            border-radius: 8px; color: white; font-size: 0.9rem; }
+        input:focus, select:focus { outline: none; border-color: var(--gold); }
+        .btn { padding: 0.8rem 2rem; background: linear-gradient(135deg, var(--gold) 0%, #d4af37 100%);
+            border: none; border-radius: 10px; color: var(--dark-blue); font-size: 1rem; font-weight: 700;
+            cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; font-family: 'Orbitron', sans-serif; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .btn-secondary { background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%); color: white; }
+        .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.8rem; margin-top: 0.8rem; }
+        .category-option { padding: 0.8rem; background: rgba(10, 20, 40, 0.7); border: 2px solid var(--blue); border-radius: 8px;
+            cursor: pointer; transition: all 0.3s; text-align: center; font-size: 0.85rem; }
+        .category-option:hover { transform: translateY(-2px); border-color: var(--gold); }
+        .category-option.selected { background: linear-gradient(135deg, var(--gold) 0%, #d4af37 100%); border-color: var(--gold); color: var(--dark-blue); }
+        .settings-readonly select, .settings-readonly input[type="number"], .settings-readonly input[type="radio"], .settings-readonly .category-option { pointer-events: none; opacity: 0.85; }
+        .team-select-btn.selected { filter: brightness(1.3); }
+        .quiz-layout { display: grid; grid-template-columns: 1fr 260px; gap: 0.8rem; height: calc(100vh - 80px); max-height: calc(100vh - 80px); }
+        .quiz-main { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; overflow: hidden; }
+        .quiz-header { display: flex; justify-content: space-between; align-items: center;
+            background: rgba(26, 39, 68, 0.8); border: 2px solid var(--gold); border-radius: 10px;
+            padding: 0.5rem 0.8rem; flex-shrink: 0; }
+        .round-info { font-family: 'Orbitron', sans-serif; font-size: 1rem; color: var(--gold); }
+        .timer { font-family: 'Orbitron', sans-serif; font-size: 1.3rem; color: var(--blue); min-width: 50px; text-align: center; }
+        .timer.warning { color: var(--red); animation: pulse 0.5s ease-in-out infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .question-section { flex: 1; background: rgba(26, 39, 68, 0.9); border: 2px solid var(--purple); border-radius: 12px;
+            padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; overflow: hidden; }
+        .question-image { max-width: 100%; max-height: 140px; object-fit: cover; border: 2px solid var(--gold);
+            border-radius: 8px; margin: 0 auto; display: block; flex-shrink: 0; }
+        .question-text { font-size: clamp(1rem, 2.5vw, 1.2rem); font-weight: 700; text-align: center; line-height: 1.4; flex-shrink: 0; }
+        .answer-section { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; flex: 1; overflow: hidden; }
+        .answer-input-area { background: rgba(10, 20, 40, 0.5); border: 2px solid var(--gold); border-radius: 8px;
+            padding: 0.6rem 1rem; min-height: 50px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.4rem; font-weight: 700; color: var(--gold); text-align: center; word-break: break-all; flex-shrink: 0; }
+        .choice-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+        .choice-btn { padding: 0.7rem 0.8rem; background: linear-gradient(135deg, var(--blue) 0%, var(--purple) 100%);
+            border: 2px solid transparent; border-radius: 8px; color: white; font-size: 1rem; font-weight: 700;
+            cursor: pointer; transition: all 0.3s; }
+        .choice-btn:hover:not(:disabled) { transform: scale(1.05); border-color: var(--gold); }
+        .choice-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: scale(1); }
+        .combo-keys { display: flex; flex-wrap: wrap; gap: 0.4rem; justify-content: center; margin: 0.5rem 0; }
+        .combo-key-btn { padding: 0.5rem 0.9rem; background: rgba(10, 20, 40, 0.8); border: 2px solid var(--blue);
+            border-radius: 8px; color: white; font-size: 1rem; font-weight: 700; cursor: pointer; transition: all 0.2s; font-family: 'Orbitron', sans-serif; }
+        .combo-key-btn:hover:not(:disabled) { transform: scale(1.08); border-color: var(--gold); box-shadow: 0 0 15px rgba(200, 155, 60, 0.5); }
+        .combo-key-btn:disabled { opacity: 0.4; cursor: default; }
+        .combo-preview { background: rgba(10, 20, 40, 0.9); border: 2px solid var(--purple); border-radius: 8px;
+            padding: 0.6rem; min-height: 45px; display: flex; align-items: center; justify-content: center; gap: 0.4rem;
+            flex-wrap: wrap; font-family: 'Orbitron', sans-serif; font-size: 1.1rem; }
+        .combo-preview-item { padding: 0.4rem 0.8rem; background: var(--gold); color: var(--dark-blue); border-radius: 8px; }
+        .submit-combo-btn { margin-top: 1rem; padding: 1rem 2rem; font-size: 1.2rem; }
+        .sidebar { display: flex; flex-direction: column; gap: 0.8rem; overflow-y: auto; min-height: 0; }
+        .scoreboard { background: rgba(26, 39, 68, 0.9); border: 2px solid var(--gold); border-radius: 10px; padding: 1rem; flex-shrink: 0; }
+        .scoreboard h3 { font-family: 'Orbitron', sans-serif; color: var(--gold); margin-bottom: 0.8rem; text-align: center; font-size: 1.1rem; }
+        .score-item { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem; margin-bottom: 0.4rem;
+            background: rgba(255, 255, 255, 0.05); border-radius: 8px; border-left: 3px solid var(--blue); }
+        .score-item.first { border-left-color: var(--gold); background: rgba(200, 155, 60, 0.1); }
+        .score-name { font-weight: 700; font-size: 0.9rem; }
+        .score-points { color: var(--gold); font-family: 'Orbitron', sans-serif; font-size: 1rem; font-weight: 700; }
+        .progress-box { background: rgba(26, 39, 68, 0.9); border: 2px solid var(--purple); border-radius: 10px; padding: 1rem; flex-shrink: 0; }
+        .progress-box h3 { font-family: 'Orbitron', sans-serif; color: var(--purple); margin-bottom: 0.8rem; text-align: center; font-size: 1rem; }
+        .progress-count { text-align: center; font-size: 1.2rem; margin-bottom: 0.5rem; color: var(--blue); font-weight: 700; }
+        .progress-item { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem; margin-bottom: 0.4rem;
+            background: rgba(255, 255, 255, 0.05); border-radius: 6px; font-size: 0.85rem; }
+        .progress-item.waiting { border-left: 3px solid rgba(255,255,255,0.3); }
+        .progress-item.correct { border-left: 3px solid var(--green); background: rgba(16, 185, 129, 0.15); }
+        .progress-item.incorrect { border-left: 3px solid var(--red); background: rgba(239, 68, 68, 0.15); }
+        .progress-badge { padding: 0.2rem 0.5rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+        .progress-badge.waiting { background: rgba(255,255,255,0.2); }
+        .progress-badge.correct { background: var(--green); color: white; }
+        .progress-badge.incorrect { background: var(--red); color: white; }
+        .mistakes-info { background: rgba(239, 68, 68, 0.2); border: 1px solid var(--red); border-radius: 6px;
+            padding: 0.4rem; text-align: center; margin-top: 0.3rem; font-size: 0.75rem; }
+        .connection-status { position: fixed; top: 0.5rem; right: 0.5rem; background: rgba(0, 0, 0, 0.8);
+            padding: 0.4rem 0.8rem; border-radius: 15px; display: flex; align-items: center; gap: 0.4rem; z-index: 100; font-size: 0.8rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .status-dot.disconnected { background: var(--red); }
+        .results-card { background: rgba(26, 39, 68, 0.9); border: 3px solid var(--gold); border-radius: 15px;
+            padding: 2rem; text-align: center; max-width: 600px; margin: 0 auto; }
+        .trophy { font-size: 4rem; margin-bottom: 0.8rem; }
+        .winner-name { font-family: 'Orbitron', sans-serif; font-size: 2rem; color: var(--gold); margin-bottom: 1rem; }
+        .results-actions { display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; }
+        .reveal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85);
+            display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; animation: fadeIn 0.3s; }
+        .reveal-title { font-size: 2rem; color: var(--gold); margin-bottom: 2rem; font-family: 'Orbitron', sans-serif; }
+        .reveal-list { display: flex; flex-direction: column; gap: 1rem; max-width: 400px; width: 90%; }
+        .reveal-item { padding: 1rem; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; }
+        .reveal-item.correct { background: rgba(16, 185, 129, 0.3); border: 2px solid var(--green); }
+        .reveal-item.incorrect { background: rgba(239, 68, 68, 0.3); border: 2px solid var(--red); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes flashCorrect { 0%, 100% { background: transparent; } 50% { background: rgba(16, 185, 129, 0.4); } }
+        .flash-correct { animation: flashCorrect 0.5s ease-out; }
+    </style>
+</head>
+<body>
+    <div class="connection-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">接続中</span>
+    </div>
+    <div class="container">
+        <h1>LoLクイズ</h1>
+        <p class="subtitle">League of Legends - オンライン対戦（全員同時回答）</p>
+        <div id="homeScreen" class="screen active">
+            <div class="setup-card">
+                <div class="input-group">
+                    <label>プレイヤー名</label>
+                    <input type="text" id="playerName" placeholder="あなたの名前を入力" maxlength="20">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                    <button class="btn" id="createRoomBtn">ルームを作成</button>
+                    <button class="btn btn-secondary" id="joinRoomBtn">ルームに参加</button>
+                </div>
+            </div>
+        </div>
+        <div id="joinScreen" class="screen">
+            <div class="setup-card">
+                <div class="input-group">
+                    <label>ルームコード</label>
+                    <input type="text" id="roomCodeInput" placeholder="6桁のコードを入力" maxlength="6" style="text-transform: uppercase;">
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                    <button class="btn btn-secondary" id="backToHomeBtn">戻る</button>
+                    <button class="btn" id="joinBtn">参加</button>
+                </div>
+            </div>
+        </div>
+        <div id="lobbyScreen" class="screen">
+            <div class="lobby-card">
+                <div style="background: rgba(10, 20, 40, 0.9); border: 2px solid var(--gold); border-radius: 10px; padding: 1rem; text-align: center; margin-bottom: 1rem;">
+                    <div style="color: var(--blue); font-size: 0.9rem; margin-bottom: 0.3rem;">ルームコード</div>
+                    <div style="font-family: 'Orbitron', sans-serif; font-size: 2rem; color: var(--gold); letter-spacing: 6px; margin: 0.3rem 0;" id="roomCode">------</div>
+                    <button id="copyCodeBtn" style="padding: 0.5rem 1.2rem; background: var(--blue); border: none; border-radius: 8px; color: white; font-weight: 700; cursor: pointer; font-size: 0.85rem;">📋 コピー</button>
+                </div>
+                <div class="input-group" id="hostSettings">
+                    <label>出題範囲設定（複数選択可）</label>
+                    <div class="category-grid" id="categoryGrid">
+                        <div class="category-option selected" data-category="champion">🎭 チャンピオン名</div>
+                        <div class="category-option" data-category="skill">⚔️ スキル効果</div>
+                        <div class="category-option" data-category="lore">📖 ストーリー</div>
+                        <div class="category-option" data-category="combo">🎯 コンボ</div>
+                        <div class="category-option" data-category="cooldown">⏱️ クールダウン</div>
+                        <div class="category-option" data-category="proplay">🏆 プロシーン</div>
+                        <div class="category-option" data-category="counter">⚔️ カウンター</div>
+                        <div class="category-option" data-category="lane">🗺️ レーン基本</div>
+                        <div class="category-option" data-category="guide">📘 LOLGUIDE風</div>
+                    </div>
+                </div>
+                <div class="input-group" id="gameModeRow">
+                    <label>ゲームモード</label>
+                    <div style="display: flex; gap: 0.8rem;">
+                        <label style="display: flex; align-items: center; cursor: pointer;"><input type="radio" name="gameMode" value="solo" checked> 個人戦</label>
+                        <label style="display: flex; align-items: center; cursor: pointer;"><input type="radio" name="gameMode" value="team"> チーム戦（最大4チーム）</label>
+                    </div>
+                </div>
+                <div class="input-group" id="pointOrderRow">
+                    <label>正解順位別ポイント（1位〜5位以降）</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                        <span>1位</span><input type="number" id="point1st" min="0" max="20" value="5" style="width: 55px;">
+                        <span>2位</span><input type="number" id="point2nd" min="0" max="20" value="3" style="width: 55px;">
+                        <span>3位</span><input type="number" id="point3rd" min="0" max="20" value="2" style="width: 55px;">
+                        <span>4位</span><input type="number" id="point4th" min="0" max="20" value="1" style="width: 55px;">
+                        <span>5位以降</span><input type="number" id="point5th" min="0" max="20" value="1" style="width: 55px;">
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0.6rem;" id="hostSettings2">
+                    <div class="input-group">
+                        <label id="winPointsLabel">勝利条件</label>
+                        <select id="winPoints">
+                            <option value="3">3pt/人</option>
+                            <option value="5" selected>5pt/人</option>
+                            <option value="7">7pt/人</option>
+                            <option value="10">10pt/人</option>
+                            <option value="15">15pt/人</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>お手付き許容</label>
+                        <select id="mistakesAllowed">
+                            <option value="1">1回</option>
+                            <option value="2" selected>2回</option>
+                            <option value="3">3回</option>
+                            <option value="5">5回</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>ミス時減点</label>
+                        <select id="missPenalty">
+                            <option value="0">0pt</option>
+                            <option value="1" selected>1pt</option>
+                            <option value="2">2pt</option>
+                            <option value="3">3pt</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>回答時間</label>
+                        <select id="answerTime">
+                            <option value="10">10秒</option>
+                            <option value="15">15秒</option>
+                            <option value="20" selected>20秒</option>
+                            <option value="30">30秒</option>
+                            <option value="45">45秒</option>
+                            <option value="60">60秒</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="input-group" id="myTeamRow" style="display: none;">
+                    <label>自分のチームを選択</label>
+                    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                        <button type="button" class="team-select-btn" data-team="1" style="padding: 0.6rem 1rem; border-radius: 8px; border: 2px solid #3B82F6; background: transparent; color: white; cursor: pointer; font-weight: 700;">チーム1</button>
+                        <button type="button" class="team-select-btn" data-team="2" style="padding: 0.6rem 1rem; border-radius: 8px; border: 2px solid #EF4444; background: transparent; color: white; cursor: pointer; font-weight: 700;">チーム2</button>
+                        <button type="button" class="team-select-btn" data-team="3" style="padding: 0.6rem 1rem; border-radius: 8px; border: 2px solid #10B981; background: transparent; color: white; cursor: pointer; font-weight: 700;">チーム3</button>
+                        <button type="button" class="team-select-btn" data-team="4" style="padding: 0.6rem 1rem; border-radius: 8px; border: 2px solid #F59E0B; background: transparent; color: white; cursor: pointer; font-weight: 700;">チーム4</button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>参加プレイヤー（最大10人）<span id="teamModeHint" style="display:none; font-size:0.8em; color:var(--purple);">※チームを選択してください</span></label>
+                    <div style="background: rgba(10, 20, 40, 0.7); border-radius: 10px; padding: 1rem; max-height: 200px; overflow-y: auto;" id="playersList"></div>
+                </div>
+                <button class="btn" id="startGameBtn" style="display: block; margin: 1rem auto 0; width: 100%;">ゲーム開始</button>
+            </div>
+        </div>
+        <div id="quizScreen" class="screen">
+            <div class="quiz-layout">
+                <div class="quiz-main">
+                    <div class="quiz-header">
+                        <div class="round-info">問題 <span id="currentRound">1</span></div>
+                        <div class="timer" id="timer">30</div>
+                    </div>
+                    <div class="question-section">
+                        <img id="questionImage" class="question-image" style="display: none;">
+                        <div class="question-text" id="questionText"></div>
+                        <div id="answerSection" class="answer-section">
+                            <div class="answer-input-area" id="answerDisplay"></div>
+                            <div id="choiceContainer"><div class="choice-grid" id="choiceGrid"></div></div>
+                            <div id="comboContainer" style="display: none;">
+                                <div class="combo-preview" id="comboPreview">コンボを入力してください</div>
+                                <div class="combo-keys" id="comboKeys"></div>
+                                <button class="btn submit-combo-btn" id="submitComboBtn" disabled>回答確定</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="sidebar">
+                    <div class="scoreboard">
+                        <h3>スコアボード</h3>
+                        <div id="scoreList"></div>
+                    </div>
+                    <div class="progress-box">
+                        <h3>回答状況</h3>
+                        <div class="progress-count" id="progressCount">0/0人完了</div>
+                        <div id="answerProgress"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="resultsScreen" class="screen">
+            <div class="results-card">
+                <div class="trophy">🏆</div>
+                <div class="winner-name" id="winnerName"></div>
+                <div id="finalScores" style="margin: 1.5rem 0;"></div>
+                <div class="results-actions">
+                    <button class="btn btn-secondary" id="continueBtn">続ける</button>
+                    <button class="btn" id="endBtn">終了</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="revealOverlay" class="reveal-overlay" style="display: none;">
+        <div class="reveal-title">🎯 正解発表</div>
+        <div id="correctAnswerDisplay" style="font-size: 1.2rem; color: var(--gold); margin-bottom: 1rem; text-align: center;"></div>
+        <div class="reveal-list" id="revealList"></div>
+        <div id="refVideoArea" style="display: none; margin-top: 1.5rem; text-align: center;">
+            <div style="font-size: 0.9rem; color: var(--gold); margin-bottom: 0.5rem;">📹 参考動画</div>
+            <a id="refVideoLink" href="#" target="_blank" rel="noopener" style="color: var(--blue); text-decoration: underline;">動画を見る</a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getDatabase, ref, set, get, onValue, update } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js';
+
+        const firebaseConfig = { databaseURL: "https://lolw-9f44d-default-rtdb.asia-southeast1.firebasedatabase.app" };
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        function playSound(freq, dur, type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.frequency.value = freq; osc.type = type || 'sine';
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+            osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + dur);
+        }
+        function playCorrect() { playSound(523.25, 0.15); setTimeout(() => playSound(659.25, 0.15), 150); setTimeout(() => playSound(783.99, 0.3), 300); }
+        function playWrong() { playSound(200, 0.5, 'square'); }
+        function playClick() { playSound(600, 0.1); }
+
+        function katakanaToHiragana(str) {
+            return str.replace(/[\u30a1-\u30f6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+        }
+        function normalizeText(str) {
+            if (!str || typeof str !== 'string') return '';
+            let s = katakanaToHiragana(str);
+            s = s.replace(/[・＝ー＆\s\u3000]/g, '');
+            return s;
+        }
+        function normalizeComboAnswer(ans) {
+            if (!ans || typeof ans !== 'string') return '';
+            return ans.replace(/[→＝\-\s\u3000,、，]/g, '').toUpperCase();
+        }
+
+        const COMBO_KEYS = ['Q', 'W', 'E', 'R', 'AA'];
+        let questionDB = { champion: [], skill: [], lore: [], combo: [], cooldown: [], proplay: [], counter: [], lane: [], guide: [] };
+        async function loadQuestionData() {
+            try {
+                const [champRes, extraRes] = await Promise.all([fetch('questions.json'), fetch('questions-extra.json')]);
+                if (!champRes.ok || !extraRes.ok) throw new Error();
+                const champData = await champRes.json();
+                const extraData = await extraRes.json();
+                questionDB.champion = (champData.champions || []).map(c => ({
+                    q: 'このチャンピオンは誰ですか', a: katakanaToHiragana(c.katakana || c.jp || ''), championId: c.id
+                }));
+                ['skill', 'lore', 'cooldown', 'proplay', 'counter', 'lane', 'guide'].forEach(cat => { questionDB[cat] = extraData[cat] || []; });
+                questionDB.combo = (extraData.combo || []).filter(q => !/[FD]/.test(String(q.a || '')));
+            } catch (e) {
+                alert('問題データの読み込みに失敗しました。questions.json と questions-extra.json を同じフォルダに置いてください。');
+            }
+        }
+
+        let state = { roomCode: null, playerName: null, isHost: false, currentAnswer: '', comboSequence: [],
+            hasAnswered: false, isSuspended: false, unsubscribe: null, lastQuestionKey: null };
+        let currentRoomData = null;
+        let timerInterval = null;
+        let scoreCalculated = false;
+
+        function generateRoomCode() {
+            let code = '';
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            for (let i = 0; i < 6; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+        function updateConnectionStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            dot.classList.toggle('disconnected', !connected);
+            text.textContent = connected ? 'オンライン' : '切断';
+        }
+
+        async function createRoom() {
+            const playerName = document.getElementById('playerName').value.trim();
+            if (!playerName) { alert('名前を入力してください'); return; }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const roomCode = generateRoomCode();
+            state.roomCode = roomCode; state.playerName = playerName; state.isHost = true;
+            await set(ref(database, `rooms/${roomCode}`), {
+                host: playerName, players: { [playerName]: { name: playerName, isHost: true, team: 1 } },
+                categories: ['champion'], gameMode: 'solo', winPoints: 5, mistakesAllowed: 2, missPenalty: 1, answerTime: 20,
+                pointByOrder: [5, 3, 2, 1, 1],
+                gameStarted: false, currentRound: 0, currentQuestion: null, phase: 'answering',
+                scores: { [playerName]: 0 }, mistakes: { [playerName]: 0 }, suspended: { [playerName]: false },
+                usedQuestions: [], playerAnswers: {}, scoreCalculated: false, timerStart: null, timestamp: Date.now()
+            });
+            showLobby();
+            listenToRoom();
+        }
+
+        function showJoinRoom() { showScreen('joinScreen'); }
+
+        async function joinRoom() {
+            const playerName = document.getElementById('playerName').value.trim();
+            const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
+            if (!playerName) { alert('プレイヤー名を入力してください'); return; }
+            if (!roomCode || roomCode.length !== 6) { alert('6桁のルームコードを入力してください'); return; }
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const snapshot = await get(ref(database, `rooms/${roomCode}`));
+            if (!snapshot.exists()) { alert('ルームが見つかりません'); return; }
+            const roomData = snapshot.val();
+            if (roomData.players && roomData.players[playerName]) { alert('この名前は既に使用されています'); return; }
+            if (Object.keys(roomData.players || {}).length >= 10) { alert('ルームが満員です（最大10人）'); return; }
+            state.roomCode = roomCode; state.playerName = playerName; state.isHost = false;
+            await update(ref(database, `rooms/${roomCode}`), {
+                [`players/${playerName}`]: { name: playerName, isHost: false, team: 0 },
+                [`scores/${playerName}`]: 0, [`mistakes/${playerName}`]: 0, [`suspended/${playerName}`]: false,
+                timestamp: Date.now()
+            });
+            showLobby();
+            listenToRoom();
+        }
+
+        function showHome() { showScreen('homeScreen'); }
+
+        function showLobby() {
+            showScreen('lobbyScreen');
+            document.getElementById('roomCode').textContent = state.roomCode;
+            const host = state.isHost;
+            document.getElementById('hostSettings').style.display = 'block';
+            document.getElementById('gameModeRow').style.display = 'block';
+            document.getElementById('pointOrderRow').style.display = 'block';
+            document.getElementById('hostSettings2').style.display = 'grid';
+            document.getElementById('startGameBtn').style.display = host ? 'block' : 'none';
+            const lobbyCard = document.querySelector('.lobby-card');
+            if (lobbyCard) {
+                lobbyCard.classList.toggle('settings-readonly', !host);
+            }
+            const isTeam = (currentRoomData?.gameMode || 'solo') === 'team';
+            document.getElementById('myTeamRow').style.display = isTeam ? 'block' : 'none';
+            syncLobbySettingsFromRoom();
+            updateTeamButtons();
+            updateConnectionStatus(true);
+        }
+        function syncLobbySettingsFromRoom() {
+            const rd = currentRoomData;
+            if (!rd) return;
+            const p = rd.pointByOrder || [5, 3, 2, 1, 1];
+            const el = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+            el('point1st', p[0]); el('point2nd', p[1]); el('point3rd', p[2]); el('point4th', p[3]); el('point5th', p[4]);
+            if (rd.winPoints != null) document.getElementById('winPoints').value = rd.winPoints;
+            if (rd.mistakesAllowed != null) document.getElementById('mistakesAllowed').value = rd.mistakesAllowed;
+            if (rd.missPenalty != null) document.getElementById('missPenalty').value = rd.missPenalty;
+            if (rd.answerTime != null) document.getElementById('answerTime').value = rd.answerTime;
+            const gm = rd.gameMode || 'solo';
+            const radio = document.querySelector(`input[name="gameMode"][value="${gm}"]`);
+            if (radio) radio.checked = true;
+            document.querySelectorAll('.category-option').forEach(opt => opt.classList.remove('selected'));
+            (rd.categories || []).forEach(cat => {
+                const opt = document.querySelector(`.category-option[data-category="${cat}"]`);
+                if (opt) opt.classList.add('selected');
+            });
+        }
+        function updateTeamButtons() {
+            const myTeam = (currentRoomData?.players || {})[state.playerName]?.team || 0;
+            document.querySelectorAll('.team-select-btn').forEach(btn => {
+                const t = parseInt(btn.getAttribute('data-team'), 10);
+                btn.classList.toggle('selected', myTeam === t);
+                btn.style.background = myTeam === t ? btn.style.borderColor : 'transparent';
+            });
+        }
+
+        function listenToRoom() {
+            const roomRef = ref(database, `rooms/${state.roomCode}`);
+            state.unsubscribe = onValue(roomRef, (snapshot) => {
+                if (!snapshot.exists()) { updateConnectionStatus(false); return; }
+                updateConnectionStatus(true);
+                currentRoomData = snapshot.val();
+                if (currentRoomData.players) updatePlayersList(Object.values(currentRoomData.players));
+                if (document.getElementById('lobbyScreen').classList.contains('active')) {
+                    syncLobbySettingsFromRoom();
+                    updateTeamButtons();
+                    document.getElementById('myTeamRow').style.display = (currentRoomData?.gameMode === 'team') ? 'block' : 'none';
+                }
+                const quizActive = document.getElementById('quizScreen').classList.contains('active');
+                if (currentRoomData.gameStarted && !quizActive) {
+                    showScreen('quizScreen');
+                    if (state.isHost && !currentRoomData.currentQuestion) setTimeout(() => nextQuestion(currentRoomData), 500);
+                }
+                if (quizActive) syncGameState(currentRoomData);
+                if (currentRoomData.showResults) showResults(currentRoomData);
+            });
+        }
+
+        const TEAM_COLORS = ['', '#3B82F6', '#EF4444', '#10B981', '#F59E0B'];
+        function updatePlayersList(players) {
+            const list = document.getElementById('playersList');
+            list.innerHTML = '';
+            const gameMode = currentRoomData?.gameMode || 'solo';
+            const isTeamMode = gameMode === 'team';
+            document.getElementById('teamModeHint').style.display = isTeamMode ? 'inline' : 'none';
+            players.forEach(p => {
+                const div = document.createElement('div');
+                const team = p.team || 0;
+                const teamColor = TEAM_COLORS[team] || 'var(--blue)';
+                div.style.cssText = 'display: flex; align-items: center; padding: 0.5rem; margin-bottom: 0.3rem; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 3px solid ' + (p.isHost ? 'var(--gold)' : teamColor);
+                let rightPart = (p.isHost ? '<span style="background: var(--gold); color: var(--dark-blue); padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.7rem; font-weight: 700; margin-right: 0.4rem;">HOST</span>' : '');
+                if (isTeamMode) {
+                    if (state.playerName === p.name) {
+                        rightPart += '<span style="display: flex; gap: 0.2rem;">';
+                        for (let t = 1; t <= 4; t++) {
+                            rightPart += `<button class="team-btn" data-team="${t}" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 6px; border: 2px solid ${TEAM_COLORS[t]}; background: ${team === t ? TEAM_COLORS[t] : 'transparent'}; color: white; cursor: pointer;">${t}</button>`;
+                        }
+                        rightPart += '</span>';
+                    } else if (team > 0) {
+                        rightPart += `<span style="background: ${teamColor}; padding: 0.2rem 0.5rem; border-radius: 8px; font-size: 0.75rem;">チーム${team}</span>`;
+                    }
+                }
+                div.innerHTML = `<div style="width: 32px; height: 32px; background: ${p.isHost ? 'var(--gold)' : teamColor}; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; color: var(--dark-blue); margin-right: 0.6rem;">${p.name.charAt(0).toUpperCase()}</div>` +
+                    `<div style="flex: 1; font-weight: 700; font-size: 0.85rem;">${p.name}</div>` + rightPart;
+                list.appendChild(div);
+            });
+            list.querySelectorAll('.team-btn').forEach(btn => {
+                btn.onclick = () => selectTeam(parseInt(btn.getAttribute('data-team')));
+            });
+        }
+        async function selectTeam(teamId) {
+            if (!state.roomCode || !state.playerName) return;
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                [`players/${state.playerName}/team`]: teamId,
+                timestamp: Date.now()
+            });
+        }
+
+        document.getElementById('copyCodeBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(state.roomCode);
+            const btn = document.getElementById('copyCodeBtn');
+            const orig = btn.textContent;
+            btn.textContent = '✓ コピー完了';
+            setTimeout(() => btn.textContent = orig, 2000);
+        });
+
+        document.getElementById('categoryGrid').addEventListener('click', e => {
+            if (!state.isHost) return;
+            const opt = e.target.closest('.category-option');
+            if (opt) opt.classList.toggle('selected');
+        });
+        document.querySelectorAll('input[name="gameMode"]').forEach(radio => {
+            radio.addEventListener('change', async () => {
+                if (!state.isHost || !state.roomCode) return;
+                const gameMode = document.querySelector('input[name="gameMode"]:checked')?.value || 'solo';
+                await update(ref(database, `rooms/${state.roomCode}`), { gameMode, timestamp: Date.now() });
+            });
+        });
+        document.querySelector('.lobby-card')?.addEventListener('click', e => {
+            const btn = e.target.closest('.team-select-btn');
+            if (btn) selectTeam(parseInt(btn.getAttribute('data-team'), 10));
+        });
+
+        async function startGameFromLobby() {
+            if (!state.isHost) return;
+            const selected = [];
+            document.querySelectorAll('.category-option.selected').forEach(o => selected.push(o.getAttribute('data-category')));
+            if (selected.length === 0) { alert('少なくとも1つの出題範囲を選択してください'); return; }
+            const gameMode = document.querySelector('input[name="gameMode"]:checked')?.value || 'solo';
+            const winPoints = parseInt(document.getElementById('winPoints').value);
+            const mistakesAllowed = parseInt(document.getElementById('mistakesAllowed').value);
+            const missPenalty = parseInt(document.getElementById('missPenalty').value);
+            const answerTime = parseInt(document.getElementById('answerTime').value);
+            const players = Object.values(currentRoomData?.players || {});
+            if (gameMode === 'team') {
+                const unassigned = players.filter(p => !p.team || p.team === 0).length;
+                if (unassigned > 0) { alert('チーム未割当のプレイヤーがいます。全員がチーム1～4を選択してください。'); return; }
+            }
+            const pointByOrder = [
+                parseInt(document.getElementById('point1st').value) || 5,
+                parseInt(document.getElementById('point2nd').value) || 3,
+                parseInt(document.getElementById('point3rd').value) || 2,
+                parseInt(document.getElementById('point4th').value) || 1,
+                parseInt(document.getElementById('point5th').value) || 1
+            ];
+            
+            // Initialize scores for all players
+            const initialScores = {};
+            const initialMistakes = {};
+            const initialSuspended = {};
+            players.forEach(p => {
+                initialScores[p.name] = 0;
+                initialMistakes[p.name] = 0;
+                initialSuspended[p.name] = false;
+            });
+            
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                categories: selected, gameMode, winPoints, mistakesAllowed, missPenalty, answerTime, pointByOrder,
+                gameStarted: true, currentRound: 1, usedQuestions: [], scoreCalculated: false, phase: 'answering',
+                playerAnswers: {}, scores: initialScores, mistakes: initialMistakes, suspended: initialSuspended,
+                timestamp: Date.now()
+            });
+        }
+
+        function getRandomUnusedQuestion(roomData) {
+            let all = [];
+            (roomData.categories || []).forEach(cat => { if (questionDB[cat]) all = all.concat(questionDB[cat]); });
+            const used = roomData.usedQuestions || [];
+            const avail = all.filter(q => !used.includes(JSON.stringify({ q: q.q, a: q.a })));
+            return avail.length ? avail[Math.floor(Math.random() * avail.length)] : all[Math.floor(Math.random() * all.length)];
+        }
+
+        function checkVictory(roomData) {
+            const scores = roomData.scores || {};
+            const gameMode = roomData.gameMode || 'solo';
+            const winPoints = roomData.winPoints || 5;
+            
+            console.log('=== checkVictory called ===');
+            console.log('Game mode:', gameMode);
+            console.log('Win points required:', winPoints);
+            console.log('Current scores:', scores);
+            
+            if (gameMode === 'team') {
+                const teamTotals = {};
+                Object.entries(roomData.players || {}).forEach(([name, p]) => {
+                    const t = p.team || 0;
+                    if (t > 0) { teamTotals[t] = (teamTotals[t] || 0) + (scores[name] || 0); }
+                });
+                const teamSizes = {};
+                Object.values(roomData.players || {}).forEach(p => {
+                    const t = p.team || 0;
+                    if (t > 0) teamSizes[t] = (teamSizes[t] || 0) + 1;
+                });
+                for (const [teamId, total] of Object.entries(teamTotals)) {
+                    const need = (teamSizes[teamId] || 1) * winPoints;
+                    console.log(`Team ${teamId}: ${total} / ${need} points`);
+                    if (total >= need) {
+                        console.log(`Team ${teamId} wins!`);
+                        return true;
+                    }
+                }
+                console.log('No team victory yet');
+                return false;
+            }
+            
+            // Solo mode
+            const maxScore = Math.max(...Object.values(scores));
+            console.log('Max score:', maxScore, '/ Required:', winPoints);
+            
+            const hasWinner = Object.values(scores).some(s => s >= winPoints);
+            if (hasWinner) {
+                console.log('Victory achieved!');
+            } else {
+                console.log('No victory yet');
+            }
+            return hasWinner;
+        }
+        async function nextQuestion(roomData) {
+            if (!state.isHost || !currentRoomData) return;
+            
+            console.log('=== nextQuestion called ===');
+            console.log('Current round:', roomData.currentRound);
+            
+            if (checkVictory(roomData)) {
+                await update(ref(database, `rooms/${state.roomCode}`), { showResults: true, timestamp: Date.now() });
+                return;
+            }
+            
+            const question = getRandomUnusedQuestion(roomData);
+            const key = JSON.stringify({ q: question.q, a: question.a });
+            const used = [...(roomData.usedQuestions || []), key];
+            const answerTime = roomData.answerTime || 30;
+            
+            console.log('Next question:', question);
+            console.log('Resetting scoreCalculated flag');
+            
+            // Reset local flag BEFORE updating database
+            scoreCalculated = false;
+            
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                currentQuestion: question, 
+                usedQuestions: used, 
+                playerAnswers: {},
+                scoreCalculated: false, 
+                phase: 'answering', 
+                timerStart: Date.now(), 
+                timestamp: Date.now()
+            });
+            
+            state.lastQuestionKey = null;
+            document.getElementById('revealOverlay').style.display = 'none';
+            
+            console.log('Starting timer for', answerTime, 'seconds');
+            startTimer(answerTime);
+        }
+
+        function displayQuestion(question) {
+            if (!question) return;
+            document.getElementById('answerDisplay').textContent = '';
+            document.getElementById('choiceGrid').innerHTML = '';
+            state.comboSequence = [];
+            const prev = document.getElementById('comboPreview');
+            if (prev) { prev.textContent = 'コンボを入力してください'; prev.innerHTML = 'コンボを入力してください'; }
+            const qKey = JSON.stringify({ q: question.q, a: question.a });
+            if (state.lastQuestionKey === qKey && !state.hasAnswered) return;
+            state.lastQuestionKey = qKey;
+            state.currentAnswer = '';
+            state.hasAnswered = false;
+            document.getElementById('questionText').textContent = question.q;
+            const imgEl = document.getElementById('questionImage');
+            if (question.championId) {
+                imgEl.src = `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${question.championId}_0.jpg`;
+                imgEl.style.display = 'block';
+            } else imgEl.style.display = 'none';
+            const isCombo = question.a && /[QWERADF]|AA|→|,/.test(String(question.a));
+            const rd = currentRoomData || {};
+            const isSuspended = rd.suspended?.[state.playerName];
+            
+            // Only disable UI if THIS player is suspended
+            // Don't disable based on scoreCalculated - let submitAnswer handle that
+            const showAnswerUI = !isSuspended;
+            
+            document.getElementById('choiceContainer').style.display = isCombo ? 'none' : 'block';
+            document.getElementById('comboContainer').style.display = isCombo ? 'block' : 'none';
+            document.getElementById('answerSection').style.pointerEvents = showAnswerUI ? 'auto' : 'none';
+            document.getElementById('answerSection').style.opacity = showAnswerUI ? '1' : '0.6';
+            if (isCombo) {
+                renderComboUI();
+            } else {
+                generateChoices(question);
+            }
+        }
+
+        function renderComboUI() {
+            const keysDiv = document.getElementById('comboKeys');
+            const previewDiv = document.getElementById('comboPreview');
+            keysDiv.innerHTML = '';
+            COMBO_KEYS.forEach(k => {
+                const btn = document.createElement('button');
+                btn.className = 'combo-key-btn';
+                btn.textContent = k;
+                btn.onclick = () => {
+                    if (state.hasAnswered) return;
+                    playClick();
+                    state.comboSequence.push(k);
+                    updateComboPreview();
+                    document.getElementById('submitComboBtn').disabled = state.comboSequence.length === 0;
+                };
+                keysDiv.appendChild(btn);
+            });
+            const clearBtn = document.createElement('button');
+            clearBtn.className = 'btn btn-secondary';
+            clearBtn.textContent = 'クリア';
+            clearBtn.style.marginLeft = '0.5rem';
+            clearBtn.onclick = () => {
+                state.comboSequence = [];
+                updateComboPreview();
+                document.getElementById('submitComboBtn').disabled = true;
+            };
+            keysDiv.appendChild(clearBtn);
+            state.comboSequence = [];
+            updateComboPreview();
+            document.getElementById('submitComboBtn').disabled = true;
+        }
+
+        function updateComboPreview() {
+            const d = document.getElementById('comboPreview');
+            if (state.comboSequence.length === 0) {
+                d.textContent = 'コンボを入力してください';
+                d.innerHTML = 'コンボを入力してください';
+            } else {
+                d.innerHTML = state.comboSequence.map(k => `<span class="combo-preview-item">${k}</span>`).join(' → ');
+            }
+        }
+
+        function generateChoices(question) {
+            const grid = document.getElementById('choiceGrid');
+            grid.innerHTML = '';
+            if (question.choices) {
+                question.choices.forEach(c => {
+                    const btn = document.createElement('button');
+                    btn.className = 'choice-btn';
+                    btn.textContent = c;
+                    btn.onclick = () => { if (!state.hasAnswered) selectChoice(c, true); };
+                    grid.appendChild(btn);
+                });
+            } else if (question.championId) {
+                generateHiraganaChoices(question.a, 0);
+            }
+        }
+
+        function generateHiraganaChoices(answer, position) {
+            if (position >= answer.length) return;
+            const correctChar = answer.charAt(position);
+            const allChars = 'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんがぎぐげござじずぜぞだぢづでどばびぶべぼぱぴぷぺぽゃゅょっー';
+            const choices = [correctChar];
+            while (choices.length < 4) {
+                const r = allChars.charAt(Math.floor(Math.random() * allChars.length));
+                if (!choices.includes(r)) choices.push(r);
+            }
+            for (let i = choices.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [choices[i], choices[j]] = [choices[j], choices[i]];
+            }
+            const grid = document.getElementById('choiceGrid');
+            grid.innerHTML = '';
+            choices.forEach(c => {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.textContent = c;
+                btn.onclick = () => {
+                    if (state.hasAnswered) return;
+                    playClick();
+                    if (c !== correctChar) {
+                        state.currentAnswer += c;
+                        document.getElementById('answerDisplay').textContent = state.currentAnswer;
+                        submitAnswer(answer);
+                        return;
+                    }
+                    state.currentAnswer += c;
+                    document.getElementById('answerDisplay').textContent = state.currentAnswer;
+                    if (state.currentAnswer.length >= answer.length) submitAnswer(answer);
+                    else generateHiraganaChoices(answer, state.currentAnswer.length);
+                };
+                grid.appendChild(btn);
+            });
+        }
+
+        function selectChoice(choice, isFinal) {
+            if (state.hasAnswered) return;
+            playClick();
+            const question = currentRoomData?.currentQuestion;
+            if (!question) return;
+            state.currentAnswer = choice;
+            document.getElementById('answerDisplay').textContent = choice;
+            submitAnswer(question.a);
+        }
+
+        document.getElementById('submitComboBtn').addEventListener('click', () => {
+            if (state.hasAnswered || !currentRoomData?.currentQuestion) return;
+            const q = currentRoomData.currentQuestion;
+            state.currentAnswer = state.comboSequence.join(',');
+            submitAnswer(q.a);
+        });
+
+        async function submitAnswer(correctAnswer) {
+            if (state.hasAnswered) return;
+            state.hasAnswered = true;
+            const roomData = currentRoomData;
+            if (!roomData) return;
+            const question = roomData.currentQuestion;
+            let correct = false;
+            if (question.a && /[QWERADF]|AA|→|,/.test(String(question.a))) {
+                const userSeq = normalizeComboAnswer(state.currentAnswer);
+                const correctSeq = normalizeComboAnswer(correctAnswer);
+                correct = userSeq === correctSeq;
+            } else {
+                correct = normalizeText(state.currentAnswer) === normalizeText(correctAnswer);
+            }
+            
+            console.log(`=== ${state.playerName} submitted answer ===`);
+            console.log('User answer:', state.currentAnswer);
+            console.log('Correct answer:', correctAnswer);
+            console.log('Is correct:', correct);
+            
+            const newMistakes = !correct ? (roomData.mistakes?.[state.playerName] || 0) + 1 : (roomData.mistakes?.[state.playerName] || 0);
+            const missPenalty = roomData.missPenalty ?? 1;
+            const penaltyValue = !correct ? missPenalty : 0;
+            const updates = {
+                [`playerAnswers/${state.playerName}`]: { answer: state.currentAnswer, correct, timestamp: Date.now(), penaltyValue },
+                [`mistakes/${state.playerName}`]: newMistakes,
+                timestamp: Date.now()
+            };
+            
+            console.log('Submitting to database:', updates);
+            
+            await update(ref(database, `rooms/${state.roomCode}`), updates);
+            document.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+            document.querySelectorAll('.combo-key-btn').forEach(b => b.disabled = true);
+            document.getElementById('submitComboBtn').disabled = true;
+            if (correct) { playCorrect(); document.body.classList.add('flash-correct'); setTimeout(() => document.body.classList.remove('flash-correct'), 500); }
+            else playWrong();
+        }
+
+        function startTimer(seconds) {
+            clearInterval(timerInterval);
+            
+            const start = Date.now();
+            let timeLeft = Math.floor(seconds);
+            const timerEl = document.getElementById('timer');
+            timerEl.textContent = timeLeft;
+            timerEl.classList.remove('warning');
+            
+            timerInterval = setInterval(() => {
+                timeLeft = Math.max(0, Math.floor(seconds - (Date.now() - start) / 1000));
+                timerEl.textContent = timeLeft;
+                
+                if (timeLeft <= 10) {
+                    timerEl.classList.add('warning');
+                }
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    
+                    // Only host triggers scoring
+                    if (state.isHost && currentRoomData && !currentRoomData.scoreCalculated && !scoreCalculated) {
+                        console.log('Timer ended, triggering showRevealAndNext');
+                        showRevealAndNext();
+                    }
+                }
+            }, 100); // Update more frequently for smoother countdown
+        }
+
+        async function showRevealAndNext() {
+            const roomData = currentRoomData;
+            if (!roomData || !state.isHost) return;
+            
+            console.log('=== showRevealAndNext called ===');
+            console.log('scoreCalculated flag:', scoreCalculated);
+            console.log('roomData.scoreCalculated:', roomData.scoreCalculated);
+            
+            // Check if already calculated using DATABASE value, not local flag
+            if (roomData.scoreCalculated) {
+                console.log('Already calculated (database flag), returning');
+                return;
+            }
+            
+            // Check local flag to prevent double execution
+            if (scoreCalculated) {
+                console.log('Already calculated (local flag), returning');
+                return;
+            }
+            
+            console.log('Proceeding with score calculation');
+            
+            clearInterval(timerInterval);
+            timerInterval = null;
+            
+            // Calculate scores - this will set scoreCalculated flag internally
+            await calculateScores(roomData);
+            
+            displayRevealOverlay(roomData);
+            
+            setTimeout(async () => {
+                document.getElementById('revealOverlay').style.display = 'none';
+                
+                // IMPORTANT: Get fresh data from database with updated scores
+                const snapshot = await get(ref(database, `rooms/${state.roomCode}`));
+                const freshData = snapshot.val();
+                
+                if (!freshData) return;
+                
+                const nextRoomData = { 
+                    ...freshData, 
+                    currentRound: (freshData.currentRound || 1) + 1 
+                };
+                
+                console.log('Moving to next question, round:', nextRoomData.currentRound);
+                console.log('Current scores:', nextRoomData.scores);
+                
+                await update(ref(database, `rooms/${state.roomCode}`), { 
+                    currentRound: nextRoomData.currentRound, 
+                    phase: 'answering',
+                    timestamp: Date.now() 
+                });
+                
+                await nextQuestion(nextRoomData);
+            }, 3000);
+        }
+
+        function displayRevealOverlay(roomData) {
+            const q = roomData.currentQuestion;
+            const correctAnswerText = q ? (q.choices ? q.a : (q.a && /[QWERADF]|AA/.test(String(q.a)) ? String(q.a).replace(/,/g, ' → ') : q.a)) : '';
+            document.getElementById('correctAnswerDisplay').textContent = correctAnswerText ? `正解: ${correctAnswerText}` : '';
+            document.getElementById('correctAnswerDisplay').style.display = correctAnswerText ? 'block' : 'none';
+            const answers = roomData.playerAnswers || {};
+            const players = Object.values(roomData.players || {});
+            const list = document.getElementById('revealList');
+            list.innerHTML = '';
+            players.forEach(p => {
+                const ans = answers[p.name];
+                const div = document.createElement('div');
+                if (ans) {
+                    div.className = 'reveal-item ' + (ans.correct ? 'correct' : 'incorrect');
+                    div.innerHTML = `<span>${p.name}</span><span>${ans.correct ? '✓ 正解' : '✗ 不正解'}</span>`;
+                } else {
+                    div.className = 'reveal-item incorrect';
+                    div.innerHTML = `<span>${p.name}</span><span>未回答</span>`;
+                }
+                list.appendChild(div);
+            });
+            const refArea = document.getElementById('refVideoArea');
+            const refLink = document.getElementById('refVideoLink');
+            if (q?.videoUrl) {
+                refLink.href = q.videoUrl;
+                refLink.textContent = q.videoTitle || '動画を見る';
+                refArea.style.display = 'block';
+            } else {
+                refArea.style.display = 'none';
+            }
+            document.getElementById('revealOverlay').style.display = 'flex';
+        }
+        function syncGameState(roomData) {
+            if (!roomData.currentQuestion && !roomData.scoreCalculated) return;
+            currentRoomData = roomData;
+            
+            // Handle reveal phase
+            if (roomData.scoreCalculated && roomData.phase === 'reveal') {
+                displayRevealOverlay(roomData);
+            } else {
+                document.getElementById('revealOverlay').style.display = 'none';
+            }
+            
+            if (!roomData.currentQuestion) return;
+            document.getElementById('currentRound').textContent = roomData.currentRound || 1;
+            
+            // Better timer sync for non-host players
+            const totalTime = roomData.answerTime || 30;
+            const start = roomData.timerStart || 0;
+            if (start) {
+                if (!state.isHost) {
+                    // For non-host: calculate remaining time based on server timestamp
+                    const elapsed = Math.floor((Date.now() - start) / 1000);
+                    const left = Math.max(0, totalTime - elapsed);
+                    
+                    // Start local timer if not already started
+                    if (!timerInterval) {
+                        startTimer(left);
+                    }
+                } else if (!timerInterval) {
+                    // Host: start timer if not already running
+                    startTimer(totalTime);
+                }
+            }
+            
+            state.isSuspended = roomData.suspended?.[state.playerName];
+            displayQuestion(roomData.currentQuestion);
+            
+            const players = Object.values(roomData.players || {});
+            const answers = roomData.playerAnswers || {};
+            const answeredCount = players.filter(p => answers[p.name]).length;
+            document.getElementById('progressCount').textContent = `${answeredCount}/${players.length}人完了`;
+            
+            const phase = roomData.phase || 'answering';
+            const progressDiv = document.getElementById('answerProgress');
+            progressDiv.innerHTML = '';
+            
+            if (phase === 'reveal' || roomData.scoreCalculated) {
+                players.forEach(p => {
+                    const ans = answers[p.name];
+                    const div = document.createElement('div');
+                    div.className = 'progress-item ' + (ans?.correct ? 'correct' : (ans ? 'incorrect' : 'waiting'));
+                    const badge = ans?.correct ? 'correct' : (ans ? 'incorrect' : 'waiting');
+                    const text = ans?.correct ? '✓ 正解' : (ans ? '✗ 不正解' : '未回答');
+                    div.innerHTML = `<span class="progress-name">${p.name}</span><span class="progress-badge ${badge}">${text}</span>`;
+                    progressDiv.appendChild(div);
+                });
+            } else {
+                players.forEach(p => {
+                    const hasAnswered = !!answers[p.name];
+                    const div = document.createElement('div');
+                    div.className = 'progress-item waiting';
+                    div.innerHTML = `<span class="progress-name">${p.name}</span><span class="progress-badge waiting">${hasAnswered ? '完了' : '回答中...'}</span>`;
+                    progressDiv.appendChild(div);
+                });
+            }
+            
+            updateScoreboard(roomData);
+            
+            // Trigger scoring when:
+            // 1. All players have answered (allDone), OR
+            // 2. Timer has ended (timerEnd)
+            const allDone = players.length > 0 && players.every(p => answers[p.name]);
+            const timerEnd = roomData.timerStart && (Date.now() - roomData.timerStart) >= ((roomData.answerTime || 30) * 1000);
+            
+            // Prevent multiple triggers
+            if (state.isHost && !roomData.scoreCalculated && !scoreCalculated && Object.keys(answers).length > 0) {
+                if (allDone || timerEnd) {
+                    console.log('Triggering showRevealAndNext - allDone:', allDone, 'timerEnd:', timerEnd);
+                    showRevealAndNext();
+                }
+            }
+        }
+
+        async function calculateScores(roomData) {
+            console.log('=== calculateScores called ===');
+            console.log('scoreCalculated flag:', scoreCalculated);
+            console.log('roomData.scoreCalculated:', roomData.scoreCalculated);
+            
+            // Only check local flag here
+            if (scoreCalculated) {
+                console.log('Already calculated (local flag), returning');
+                return;
+            }
+            
+            console.log('Starting score calculation...');
+            
+            const answers = roomData.playerAnswers || {};
+            console.log('Player answers:', answers);
+            
+            // Ensure all players have score entries
+            const scores = { ...(roomData.scores || {}) };
+            const players = Object.values(roomData.players || {});
+            players.forEach(p => {
+                if (!(p.name in scores)) {
+                    scores[p.name] = 0;
+                }
+            });
+            
+            console.log('Current scores before calculation:', scores);
+            
+            const mistakes = roomData.mistakes || {};
+            const mistakesAllowed = roomData.mistakesAllowed || 2;
+            const suspended = { ...(roomData.suspended || {}) };
+            const pointByOrder = roomData.pointByOrder || [5, 3, 2, 1, 1];
+            const correctEntries = Object.entries(answers).filter(([, a]) => a.correct && a.timestamp != null);
+            
+            console.log('Correct entries:', correctEntries);
+            console.log('Point distribution:', pointByOrder);
+            
+            correctEntries.sort((a, b) => a[1].timestamp - b[1].timestamp);
+            correctEntries.forEach(([name], index) => {
+                const pt = pointByOrder[Math.min(index, pointByOrder.length - 1)];
+                const oldScore = scores[name] || 0;
+                scores[name] = oldScore + pt;
+                console.log(`${name} gets ${pt} points (rank ${index + 1}), score: ${oldScore} -> ${scores[name]}`);
+            });
+            
+            const missPenalty = roomData.missPenalty ?? 1;
+            Object.entries(answers).forEach(([name, ans]) => {
+                if (!ans.correct) {
+                    const penalty = ans.penaltyValue ?? missPenalty;
+                    const oldScore = scores[name] || 0;
+                    scores[name] = Math.max(0, oldScore - penalty);
+                    console.log(`${name} penalty ${penalty}, score: ${oldScore} -> ${scores[name]}`);
+                    if (mistakes[name] >= mistakesAllowed) suspended[name] = true;
+                }
+            });
+            
+            // Ensure all players have suspended status
+            players.forEach(p => {
+                if (!(p.name in suspended)) suspended[p.name] = false;
+            });
+            
+            console.log('Final scores after calculation:', scores);
+            console.log('Updating database with scores...');
+            
+            // NOW set the flag AFTER calculation is complete
+            scoreCalculated = true;
+            
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                scoreCalculated: true, 
+                phase: 'reveal', 
+                scores: scores, 
+                suspended: suspended, 
+                timestamp: Date.now()
+            });
+            
+            console.log('Database update complete with scores:', scores);
+        }
+
+        function updateScoreboard(roomData) {
+            console.log('=== updateScoreboard called ===');
+            console.log('roomData.scores:', roomData.scores);
+            
+            const list = document.getElementById('scoreList');
+            list.innerHTML = '';
+            const gameMode = roomData.gameMode || 'solo';
+            const winPoints = roomData.winPoints || 5;
+            const scores = roomData.scores || {};
+            
+            console.log('Scores object:', scores);
+            console.log('Game mode:', gameMode);
+            
+            if (gameMode === 'team') {
+                const teamData = {};
+                Object.entries(roomData.players || {}).forEach(([name, p]) => {
+                    const t = p.team || 0;
+                    if (t > 0) {
+                        if (!teamData[t]) teamData[t] = { total: 0, members: [], size: 0 };
+                        teamData[t].total += scores[name] || 0;
+                        teamData[t].members.push({ name, score: scores[name] || 0 });
+                        teamData[t].size++;
+                    }
+                });
+                const sorted = Object.entries(teamData).sort((a, b) => b[1].total - a[1].total);
+                sorted.forEach(([teamId, data], i) => {
+                    const need = data.size * winPoints;
+                    const div = document.createElement('div');
+                    div.className = 'score-item' + (i === 0 ? ' first' : '');
+                    div.style.borderLeftColor = TEAM_COLORS[teamId] || 'var(--blue)';
+                    div.innerHTML = `<span class="score-name">チーム${teamId} (${data.total}/${need}pt)</span><span class="score-points">${data.total}pt</span>`;
+                    list.appendChild(div);
+                    data.members.forEach(m => {
+                        const sub = document.createElement('div');
+                        sub.style.cssText = 'font-size: 0.8rem; padding-left: 1rem; opacity: 0.9;';
+                        sub.innerHTML = `<span>${m.name}</span><span>${m.score}pt</span>`;
+                        list.appendChild(sub);
+                    });
+                });
+                const unassigned = Object.values(roomData.players || {}).filter(p => !p.team || p.team === 0);
+                unassigned.forEach(p => {
+                    const div = document.createElement('div');
+                    div.className = 'score-item';
+                    div.innerHTML = `<span class="score-name">${p.name}（未割当）</span><span class="score-points">${scores[p.name] || 0}pt</span>`;
+                    list.appendChild(div);
+                });
+            } else {
+                const players = Object.values(roomData.players || {}).sort((a, b) =>
+                    (scores[b.name] || 0) - (scores[a.name] || 0));
+                const mistakes = roomData.mistakes || {};
+                const suspended = roomData.suspended || {};
+                players.forEach((p, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'score-item' + (i === 0 ? ' first' : '') + (suspended[p.name] ? ' suspended' : '');
+                    div.innerHTML = `<span class="score-name">${p.name}${suspended[p.name] ? ' 🚫' : ''}</span><span class="score-points">${scores[p.name] || 0}pt</span>`;
+                    if (mistakes[p.name] > 0 && !suspended[p.name]) {
+                        const m = document.createElement('div');
+                        m.className = 'mistakes-info';
+                        m.textContent = `お手付き: ${mistakes[p.name]}/${roomData.mistakesAllowed || 2}`;
+                        div.appendChild(m);
+                    }
+                    list.appendChild(div);
+                });
+            }
+        }
+
+        function showResults(roomData) {
+            showScreen('resultsScreen');
+            const scores = roomData.scores || {};
+            const gameMode = roomData.gameMode || 'solo';
+            const fs = document.getElementById('finalScores');
+            fs.innerHTML = '';
+            if (gameMode === 'team') {
+                const teamData = {};
+                Object.entries(roomData.players || {}).forEach(([name, p]) => {
+                    const t = p.team || 0;
+                    if (t > 0) {
+                        if (!teamData[t]) teamData[t] = { total: 0, members: [], size: 0 };
+                        teamData[t].total += scores[name] || 0;
+                        teamData[t].members.push({ name, score: scores[name] || 0 });
+                        teamData[t].size++;
+                    }
+                });
+                const sorted = Object.entries(teamData).sort((a, b) => b[1].total - a[1].total);
+                const winner = sorted[0];
+                document.getElementById('winnerName').textContent = winner ? `🎉 チーム${winner[0]} 優勝! 🎉` : '';
+                sorted.forEach(([teamId, data], i) => {
+                    const d = document.createElement('div');
+                    d.style.cssText = 'font-size: 1.1rem; padding: 0.8rem; margin: 0.4rem 0; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 4px solid ' + (TEAM_COLORS[teamId] || 'var(--blue)');
+                    d.innerHTML = `<div style="font-weight: 700; margin-bottom: 0.3rem;">チーム${teamId}: ${data.total}pt</div>` +
+                        data.members.map(m => `<div style="font-size: 0.9rem; padding-left: 1rem;">${m.name}: ${m.score}pt</div>`).join('');
+                    fs.appendChild(d);
+                });
+            } else {
+                const players = Object.values(roomData.players || {}).sort((a, b) =>
+                    (scores[b.name] || 0) - (scores[a.name] || 0));
+                document.getElementById('winnerName').textContent = players.length ? `🎉 ${players[0].name} 優勝! 🎉` : '';
+                players.forEach((p, i) => {
+                    const d = document.createElement('div');
+                    d.style.cssText = 'font-size: 1.1rem; padding: 0.8rem; margin: 0.4rem 0; background: rgba(255,255,255,0.05); border-radius: 8px;';
+                    d.innerHTML = `<span style="display: inline-block; width: 35px; height: 35px; background: var(--gold); color: var(--dark-blue); border-radius: 50%; line-height: 35px; margin-right: 0.8rem; font-weight: 700; text-align: center;">${i + 1}</span>${p.name}: ${scores[p.name] || 0}pt`;
+                    fs.appendChild(d);
+                });
+            }
+            playCorrect();
+            setTimeout(playCorrect, 300);
+            setTimeout(playCorrect, 600);
+        }
+
+        async function continueGame() {
+            if (!state.isHost) return;
+            const roomData = currentRoomData;
+            if (!roomData) return;
+            const players = Object.values(roomData.players || {});
+            const resetScores = {}; const resetMistakes = {}; const resetSuspended = {};
+            players.forEach(p => {
+                resetScores[p.name] = 0; resetMistakes[p.name] = 0; resetSuspended[p.name] = false;
+            });
+            await update(ref(database, `rooms/${state.roomCode}`), {
+                scores: resetScores, mistakes: resetMistakes, suspended: resetSuspended,
+                showResults: false, gameStarted: true, currentRound: 1, usedQuestions: [],
+                playerAnswers: {}, scoreCalculated: false, phase: 'answering', timestamp: Date.now()
+            });
+            showScreen('quizScreen');
+            const baseData = { ...roomData, scores: resetScores, mistakes: resetMistakes, suspended: resetSuspended, currentRound: 1, usedQuestions: [], playerAnswers: {} };
+            setTimeout(() => nextQuestion(baseData), 500);
+        }
+
+        function endGame() {
+            if (state.unsubscribe) state.unsubscribe();
+            location.reload();
+        }
+
+        document.getElementById('createRoomBtn').addEventListener('click', createRoom);
+        document.getElementById('joinRoomBtn').addEventListener('click', showJoinRoom);
+        document.getElementById('backToHomeBtn').addEventListener('click', showHome);
+        document.getElementById('joinBtn').addEventListener('click', joinRoom);
+        document.getElementById('startGameBtn').addEventListener('click', startGameFromLobby);
+        document.getElementById('continueBtn').addEventListener('click', continueGame);
+        document.getElementById('endBtn').addEventListener('click', endGame);
+        loadQuestionData();
+    </script>
+</body>
+</html>
